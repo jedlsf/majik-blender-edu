@@ -9,6 +9,7 @@ This addon leverages **Blender's native Python API** for precise action logging 
 - [Majik Blender Edu](#majik-blender-edu)
   - [Key Features](#key-features)
   - [Technical Overview](#technical-overview)
+  - [Installation](#installation)
     - [Option 1: Install from Prebuilt ZIP (Recommended)](#option-1-install-from-prebuilt-zip-recommended)
     - [Option 2: Build from Source (Advanced / Developers)](#option-2-build-from-source-advanced--developers)
     - [More Information](#more-information)
@@ -50,7 +51,7 @@ This addon leverages **Blender's native Python API** for precise action logging 
 
 ---
 
-##Installation
+## Installation
 
 Majik Blender Edu can be installed either by downloading a prebuilt extension package or by building the extension directly from the source code.
 
