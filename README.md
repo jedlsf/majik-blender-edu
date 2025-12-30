@@ -9,7 +9,9 @@ This addon leverages **Blender's native Python API** for precise action logging 
 - [Majik Blender Edu](#majik-blender-edu)
   - [Key Features](#key-features)
   - [Technical Overview](#technical-overview)
-  - [Installation](#installation)
+    - [Option 1: Install from Prebuilt ZIP (Recommended)](#option-1-install-from-prebuilt-zip-recommended)
+    - [Option 2: Build from Source (Advanced / Developers)](#option-2-build-from-source-advanced--developers)
+    - [More Information](#more-information)
   - [How to Use](#how-to-use)
     - [For Teachers](#for-teachers)
     - [For Students](#for-students)
@@ -48,14 +50,56 @@ This addon leverages **Blender's native Python API** for precise action logging 
 
 ---
 
-## Installation
+##Installation
+
+Majik Blender Edu can be installed either by downloading a prebuilt extension package or by building the extension directly from the source code.
+
+### Option 1: Install from Prebuilt ZIP (Recommended)
 
 1. Download the `.zip` file.
-   - For Teachers ([Download Here](https://extensions.blender.org/approval-queue/majik-blender-edu-teacher))
-   - For Students ([Download Here](https://extensions.blender.org/approval-queue/majik-blender-edu-students))
-2. Open **Blender > Preferences > Extensions > Install from Disk**.  
+   - For Teachers ([Download Majik Blender Edu – Teacher](https://extensions.blender.org/approval-queue/majik-blender-edu-teacher))
+   - For Students ([Download Majik Blender Edu – Students](https://extensions.blender.org/approval-queue/majik-blender-edu-students))
+2. Open **Blender > Edit > Preferences > Extensions > Install from Disk**.  
 3. Enable **Majik Blender Edu**.  
 
+### Option 2: Build from Source (Advanced / Developers)
+
+You may also install Majik Blender Edu by cloning or downloading the GitHub repository and building the extension ZIP yourself using Blender’s command-line extension builder.
+
+1. Clone or download the repository:
+```bash
+
+git clone https://github.com/your-org/majik-blender-edu.git
+
+```
+> (Or download the ZIP from GitHub and extract it.)
+
+
+2. Run the following command to build the extension ZIP:
+
+```bash
+
+& "C:\Program Files\Blender Foundation\Blender 5.0\blender.exe" `
+  --background `
+  --factory-startup `
+  --command extension build `
+  --source-dir "C:\majik-blender-edu\majik_blender_edu_students" `
+  --output-dir "C:\majik-blender-edu\dist\students" `
+  --split-platforms `
+  --verbose
+
+```
+
+3. Once built, locate the generated `.zip` file in the output directory.
+3. Open **Blender > Edit > Preferences > Extensions > Install from Disk**.  
+4. Enable **Majik Blender Edu**.  
+
+### More Information
+
+For full details on Blender’s extension build system and available command-line options, see the official documentation:
+
+[https://docs.blender.org/manual/en/dev/advanced/command_line/extension_arguments.html#command-line-args-extension-build](https://docs.blender.org/manual/en/dev/advanced/command_line/extension_arguments.html#command-line-args-extension-build)
+   
 ---
 
 ## How to Use
