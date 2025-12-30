@@ -4,14 +4,6 @@ import base64
 import json
 
 
-from .constants import (
-    SCENE_LOGS,
-    SCENE_STUDENT_ID_HASH,
-    SCENE_TEACHER_DOUBLE_HASH,
-    SCENE_SIGNATURE_MODE,
-)
-
-from ..core import runtime
 
 
 # --------------------------------------------------

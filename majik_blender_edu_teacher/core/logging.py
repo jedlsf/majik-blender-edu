@@ -7,7 +7,7 @@ import hashlib
 import re
 
 from ..core import runtime
-from .crypto import decrypt_metadata, is_crypto_available, encrypt_metadata
+from .crypto import decrypt_metadata, encrypt_metadata
 
 from .constants import (
     SCENE_LOGS,

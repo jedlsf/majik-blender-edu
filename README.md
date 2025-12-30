@@ -50,8 +50,10 @@ This addon leverages **Blender's native Python API** for precise action logging 
 
 ## Installation
 
-1. Download the `.zip` file.  
-2. Open **Blender > Preferences > Add-ons > Install**.  
+1. Download the `.zip` file.
+   - For Teachers ([Download Here](https://extensions.blender.org/approval-queue/majik-blender-edu-teacher))
+   - For Students ([Download Here](https://extensions.blender.org/approval-queue/majik-blender-edu-students))
+2. Open **Blender > Preferences > Extensions > Install from Disk**.  
 3. Enable **Majik Blender Edu**.  
 
 ---
