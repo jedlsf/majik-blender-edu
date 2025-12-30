@@ -4,6 +4,22 @@
 
 This addon leverages **Blender's native Python API** for precise action logging and the **cryptography library** ([pyca/cryptography](https://github.com/pyca/cryptography), [cryptography.io](https://cryptography.io/)) for secure storage. Logs are encrypted with **AES Fernet**, and only the teacher with the correct key can decrypt them.  
 
+
+
+- [Majik Blender Edu](#majik-blender-edu)
+  - [Key Features](#key-features)
+  - [Technical Overview](#technical-overview)
+  - [Installation](#installation)
+  - [How to Use](#how-to-use)
+    - [For Teachers](#for-teachers)
+    - [For Students](#for-students)
+  - [Contributing](#contributing)
+  - [Notes](#notes)
+  - [License](#license)
+  - [Author](#author)
+  - [About the Developer](#about-the-developer)
+  - [Contact](#contact)
+
 ---
 
 ## Key Features
