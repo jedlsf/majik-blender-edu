@@ -111,7 +111,16 @@ If you want to contribute or help extend support to more Blender versions and pl
 
 ## License
 
-[MIT](LICENSE) — free for personal and commercial use.
+This project is licensed under the **GNU General Public License v3.0 or later (GPL-3.0-or-later)**.
+
+You are free to use, modify, and redistribute this software under the terms of the GPL.
+Any derivative works must also be distributed under the same license.
+
+See the [LICENSE](LICENSE) file for full details.
+
+> ⚠️ Note for educators and institutions  
+> This software is open-source under GPL-3.0-or-later.  
+> If you modify and redistribute it (internally or externally), those changes must also be shared under the same license.
 
 ---
 

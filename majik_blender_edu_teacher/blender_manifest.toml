@@ -1,0 +1,49 @@
+
+schema_version = "1.0.0"
+
+
+id = "majik_blender_edu_teacher"
+
+
+version = "1.0.0"
+name = "Majik Blender Edu - Teacher"
+tagline = "Submission integrity tool for educators to verify students' Blender work"
+maintainer = "Zelijah"
+
+type = "add-on"
+
+
+blender_version_min = "5.0.0"
+
+
+license = [
+    "SPDX:GPL-3.0-or-later"
+]
+
+copyright = [
+    "2025 Josef Elijah Delos Santos Fabian",
+    "2014 Zelijah"
+]
+
+
+website = "https://thezelijah.world/tools/education-majik-blender-edu"
+documentation = "https://github.com/jedlsf/majik-blender-edu"
+
+
+tags = ["System", "Pipeline", "Scene", "Modeling", "Mesh", "User Interface"]
+
+
+platforms = ["windows-x64", "macos-arm64", "linux-x64"]
+
+
+wheels = [
+    "./wheels/cffi-2.0.0-cp311-cp311-win_amd64.whl",
+    "./wheels/cryptography-46.0.3-cp311-abi3-macosx_10_9_universal2.whl",
+    "./wheels/cryptography-46.0.3-cp311-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+    "./wheels/cryptography-46.0.3-cp311-abi3-win_amd64.whl"
+]
+
+
+[permissions]
+network = "Access required for JSON file analysis"
+files = "Read/write keys and logs as JSON for integrity verification"
