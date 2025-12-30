@@ -132,7 +132,7 @@ Made with 💙 by [@thezelijah](https://github.com/jedlsf)
 
 - **Developer**: Josef Elijah Fabian
 - **GitHub**: [https://github.com/jedlsf](https://github.com/jedlsf)
-- **Project Repository**: [https://github.com/jedlsf/majik-runway](https://github.com/jedlsf/majik-runway)
+- **Project Repository**: [https://github.com/jedlsf/majik-blender-edu](https://github.com/jedlsf/majik-blender-edu)
 
 ---
 

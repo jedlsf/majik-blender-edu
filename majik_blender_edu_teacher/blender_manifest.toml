@@ -7,7 +7,7 @@ id = "majik_blender_edu_teacher"
 
 version = "1.0.0"
 name = "Majik Blender Edu - Teacher"
-tagline = "Submission integrity tool for educators to verify students' Blender work"
+tagline = "Submission integrity tool for educators to verify students' work"
 maintainer = "Zelijah"
 
 type = "add-on"

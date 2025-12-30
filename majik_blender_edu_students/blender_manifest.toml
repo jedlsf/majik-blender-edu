@@ -4,12 +4,10 @@ schema_version = "1.0.0"
 
 id = "majik_blender_edu_students"
 
-
 version = "1.0.0"
 name = "Majik Blender Edu - Students"
-tagline = "Submission integrity tool for educators to verify students' Blender work"
+tagline = "Track your Blender progress and safely submit your work"
 maintainer = "Zelijah"
-
 type = "add-on"
 
 
