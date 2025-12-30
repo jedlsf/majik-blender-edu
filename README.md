@@ -91,6 +91,19 @@ git clone https://github.com/your-org/majik-blender-edu.git
 
 ```
 
+```bash
+
+& "C:\Program Files\Blender Foundation\Blender 5.0\blender.exe" `
+  --background `
+  --factory-startup `
+  --command extension build `
+  --source-dir "C:\majik-blender-edu\majik_blender_edu_teacher" `
+  --output-dir "C:\majik-blender-edu\dist\teacher" `
+  --split-platforms `
+  --verbose
+
+```
+
 3. Once built, locate the generated `.zip` file in the output directory.
 3. Open **Blender > Edit > Preferences > Extensions > Install from Disk**.  
 4. Enable **Majik Blender Edu**.  
