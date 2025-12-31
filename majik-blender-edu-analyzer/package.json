@@ -1,0 +1,60 @@
+{
+  "name": "@thezelijah/majik-blender-edu-analyzer",
+  "version": "1.0.0",
+  "description": "Majik Blender Edu is a submission integrity and student activity tracking addon for Blender designed to help educators verify a student's work. It records Blender-specific actions such as editing meshes, adding modifiers, importing assets, and scene statistics (vertices, faces, etc.), ensuring that submitted projects are authentic and untampered.",
+  "license": "Apache-2.0",
+  "author": "Zelijah",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jedlsf/majik-blender-edu.git"
+  },
+  "keywords": [
+    "majik",
+    "majik-blender-edu",
+    "runway-management",
+    "runway-finance",
+    "cost-of-runway",
+    "COS",
+    "revenue-calculation",
+    "profit-calculation",
+    "financial-modeling",
+    "capacity-planning",
+    "resource-planning",
+    "timesheet",
+    "billing",
+    "pricing",
+    "business-tools",
+    "typescript",
+    "javascript",
+    "enterprise-tools",
+    "monetary-calculation",
+    "majik-money",
+    "runway-analytics",
+    "forecasting"
+  ],
+  "homepage": "https://github.com/jedlsf/majik-blender-edu#readme",
+  "bugs": {
+    "url": "https://github.com/jedlsf/majik-blender-edu/issues"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "fernet": "^0.3.3",
+    "nanoid": "^5.1.6"
+  },
+  "devDependencies": {
+    "@types/fernet": "^0.4.3",
+    "@types/node": "^25.0.3",
+    "typescript": "^5.9.3"
+  }
+}

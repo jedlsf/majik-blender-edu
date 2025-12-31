@@ -271,6 +271,7 @@ def add_log(
             student_id=scene.student_id,
         )
 
+
     entry: ActionLogEntry = {
         "t": round(time.time(), 3),
         "a": action_type,
@@ -281,6 +282,8 @@ def add_log(
         "s": get_scene_stats(scene),
         "ph": prev_hash,
     }
+
+
 
     runtime._runtime_logs_raw.append(entry)
     runtime.mark_dirty()
