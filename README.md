@@ -24,6 +24,21 @@ This addon leverages **Blender's native Python API** for precise action logging 
       - [**3. Action Logs**](#3-action-logs)
     - [How the Numbers Work](#how-the-numbers-work)
     - [Integration \& SDK](#integration--sdk)
+    - [Installation](#installation-1)
+    - [Quick Start](#quick-start)
+    - [Example Usage](#example-usage)
+    - [API Reference](#api-reference)
+      - [`MajikBlenderEdu` Class](#majikblenderedu-class)
+        - [1. Initialization \& Parsing](#1-initialization--parsing)
+        - [2. Integrity \& Validation](#2-integrity--validation)
+        - [3. Time \& Session Metrics](#3-time--session-metrics)
+        - [4. Scene \& Modeling Metrics](#4-scene--modeling-metrics)
+        - [5. Behavioral Analysis](#5-behavioral-analysis)
+        - [6. Scoring \& Verdicts](#6-scoring--verdicts)
+        - [7. Charts \& Visualization (Plotly Data)](#7-charts--visualization-plotly-data)
+        - [8. Export \& Serialization](#8-export--serialization)
+      - [Types](#types)
+      - [Utils / Functions](#utils--functions)
   - [Contributing](#contributing)
   - [Notes](#notes)
   - [License](#license)
@@ -240,6 +255,595 @@ Majik Blender Edu is designed to be flexible. You can integrate it into your own
 | **Student Addon** | Log actions for submission.                              | [Download](https://extensions.blender.org/approval-queue/majik-blender-edu-students)                           |
 | **Analyzer SDK**  | TypeScript/NPM package to process logs programmatically. | [@thezelijah/majik-blender-edu-analyzer](https://www.npmjs.com/package/@thezelijah/majik-blender-edu-analyzer) |
 | **Source Code**   | Full source, issues, and contribution guide.             | [GitHub Repo](https://github.com/jedlsf/majik-blender-edu)                                                     |
+
+---
+
+
+### Installation
+
+```bash
+npm install @thezelijah/majik-blender-edu-analyzer
+```
+
+---
+
+
+### Quick Start
+
+```ts
+import { MajikBlenderEdu } from "@thezelijah/majik-blender-edu-analyzer";
+
+const edu = MajikBlenderEdu.initialize(
+  decryptedActionLogJSON,
+  teacherAESKey,
+  studentId
+);
+
+const summary = edu.getSummary();
+console.log(summary.score, summary.verdict);
+```
+
+---
+
+
+### Example Usage
+
+```tsx
+"use client";
+
+import React, { useMemo, useState } from "react";
+import styled from "styled-components";
+import {
+  GearIcon,
+  InfoIcon,
+  LogIcon,
+  ShieldCheckIcon,
+  ClockIcon,
+  RocketIcon,
+  NotebookIcon,
+  StarIcon,
+  SquaresFourIcon,
+  CubeIcon,
+  LightningIcon,
+  HourglassIcon,
+  FunnelIcon,
+} from "@phosphor-icons/react";
+import DynamicPagedTab, {
+  TabContent,
+} from "@/components/functional/DynamicPagedTab";
+
+import { formatPercentage, formatTime } from "@/utils/helper";
+
+import { DynamicColoredValue } from "@/components/foundations/DynamicColoredValue";
+import theme from "@/globals/theme";
+
+import { MajikBlenderEdu } from "@/SDK/tools/education/majik-blender-edu/majik-blender-edu";
+import MajikBlenderEduHealthIndicator from "./MajikBlenderEduHealthIndicator";
+import SetupMajikBlenderEdu from "./SetupMajikBlenderEdu";
+import ActionLogViewer from "./ActionLogViewer";
+import PlotlyTrendChart from "@/components/plotly/PlotlyTrendChart";
+import PlotlyPieChart from "@/components/plotly/PlotlyPieChart";
+
+// ======== Styled Components ========
+const RootContainer = styled.div`
+//css
+`;
+
+const HeaderCards = styled.div`
+//css
+`;
+
+const TopHeaderRow = styled.div`
+//css
+`;
+
+const Card = styled.div`
+//css
+`;
+
+const CardTitle = styled.div`
+//css
+`;
+
+const CardValue = styled.div`
+//css
+`;
+
+const CardSubtext = styled.div`
+//css
+`;
+
+const MainGrid = styled.div`
+//css
+`;
+
+const ChartPlaceholder = styled.div`
+//css
+`;
+
+interface DashboardMajikBlenderEduProps {
+  instance: MajikBlenderEdu;
+  onUpdate?: (updatedInstance: MajikBlenderEdu) => void;
+}
+
+// ======== Main Component ========
+
+const DashboardMajikBlenderEdu: React.FC<DashboardMajikBlenderEduProps> = ({
+  instance,
+}) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [refreshKey, setRefreshKey] = useState<number>(0);
+  const dashboardSnapshot = useMemo(
+    () => instance.getSummary(),
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [instance, refreshKey]
+  );
+
+  const health = useMemo(
+    () => instance.getEduHealth(),
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [instance, refreshKey]
+  );
+
+  const integrityStatus = useMemo(
+    () => instance.validateLogChain(),
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [instance, refreshKey]
+  );
+
+  const chartSceneGrowthOverTime = useMemo(
+    () => instance.getPlotlySceneGrowthOverTime(),
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [instance, refreshKey]
+  );
+
+  const chartActionDensity = useMemo(
+    () => instance.getPlotlyActionDensity(),
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [instance, refreshKey]
+  );
+
+  const chartActionTypePie = useMemo(
+    () => instance.getPlotlyActionTypePie(),
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [instance, refreshKey]
+  );
+
+  const chartAuthenticityScorePie = useMemo(
+    () => instance.getPlotlyAuthenticityScorePie(),
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [instance, refreshKey]
+  );
+
+  const chartEntropyTrend = useMemo(
+    () => instance.getPlotlyEntropyTrend(),
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [instance, refreshKey]
+  );
+
+  const chartIdleTimeTraces = useMemo(
+    () => instance.getPlotlyIdleTimeTraces(),
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [instance, refreshKey]
+  );
+
+  const InformationTabs: TabContent[] = [
+    {
+      id: "info-overview",
+      name: "Overview",
+      icon: InfoIcon,
+      content: (
+        <>
+          <TopHeaderRow>
+            <MajikBlenderEduHealthIndicator health={health} />
+          </TopHeaderRow>
+
+          {/* ===== Header / KPI Cards ===== */}
+          <HeaderCards>
+            <Card>
+              <CardTitle>
+                <ShieldCheckIcon size={20} /> Integrity Status
+              </CardTitle>
+              <CardValue>{integrityStatus ? "VALID" : "TAMPERED"}</CardValue>
+              <CardSubtext>{!!dashboardSnapshot.flags.join(", ")}</CardSubtext>
+            </Card>
+            <Card>
+              <CardTitle>
+                <ClockIcon size={20} />
+                Total Working Time
+              </CardTitle>
+              <CardValue>
+                {formatTime(
+                  dashboardSnapshot.totalWorkingTime,
+                  "seconds",
+                  undefined,
+                  true,
+                  "duration"
+                )}
+              </CardValue>
+            </Card>
+
+            <Card>
+              <CardTitle>
+                <RocketIcon size={20} />
+                Effective Time
+              </CardTitle>
+              <CardValue>
+                {formatTime(
+                  dashboardSnapshot.effectiveTime,
+                  "seconds",
+                  undefined,
+                  true,
+                  "duration"
+                )}
+              </CardValue>
+            </Card>
+
+            <Card>
+              <CardTitle>
+                <NotebookIcon size={20} /> Total Logs
+              </CardTitle>
+              <CardValue>
+                {dashboardSnapshot.totalLogs.toLocaleString()}
+              </CardValue>
+            </Card>
+
+            <Card>
+              <CardTitle>
+                <StarIcon size={20} /> Authenticity Score
+              </CardTitle>
+              <CardValue>
+                <DynamicColoredValue
+                  value={dashboardSnapshot.score} // numeric months remaining
+                  colorsMap={[
+                    { color: theme.colors.error, max: 59.99 },
+                    { color: theme.colors.brand.white, min: 60, max: 84.99 },
+                    { color: theme.colors.brand.green, min: 85 },
+                  ]}
+                  size={28}
+                  weight={700}
+                >
+                  {dashboardSnapshot.score}/100
+                </DynamicColoredValue>
+              </CardValue>
+            </Card>
+          </HeaderCards>
+
+          {/* ===== SubHeader / Secondary KPI Cards ===== */}
+          <HeaderCards>
+            <Card>
+              <CardTitle>
+                <SquaresFourIcon size={20} /> Total Vertices
+              </CardTitle>
+              <CardValue>
+                {dashboardSnapshot.totalVertices.toLocaleString()}
+              </CardValue>
+            </Card>
+            <Card>
+              <CardTitle>
+                <CubeIcon size={20} /> Total Objects
+              </CardTitle>
+              <CardValue>
+                {dashboardSnapshot.totalObjects.toLocaleString()}
+              </CardValue>
+            </Card>
+            <Card>
+              <CardTitle>
+                <LightningIcon size={20} /> Most Active Object
+              </CardTitle>
+              <CardValue>{dashboardSnapshot.mostActiveObject}</CardValue>
+            </Card>
+
+            <Card>
+              <CardTitle>
+                <HourglassIcon size={20} />
+                Idle Ratio
+              </CardTitle>
+              <CardValue>
+                <DynamicColoredValue
+                  value={dashboardSnapshot.idleRatio ?? 0}
+                  colorsMap={[
+                    { color: theme.colors.brand.green, max: 0.299 },
+                    { color: theme.colors.brand.white, min: 0.3, max: 0.799 },
+                    { color: theme.colors.error, min: 0.8 },
+                  ]}
+                  size={28}
+                  weight={700}
+                >
+                  {formatPercentage(dashboardSnapshot.idleRatio ?? 0, true)}
+                </DynamicColoredValue>
+              </CardValue>
+            </Card>
+            <Card>
+              <CardTitle>
+                <FunnelIcon size={20} />
+                Entropy Score
+              </CardTitle>
+              <CardValue>
+                <DynamicColoredValue
+                  value={dashboardSnapshot.entropyScore ?? 0}
+                  colorsMap={[
+                    { color: theme.colors.error, max: 1.299 },
+                    { color: theme.colors.brand.white, min: 1.3, max: 1.499 },
+                    { color: theme.colors.brand.green, min: 1.5 },
+                  ]}
+                  size={28}
+                  weight={700}
+                >
+                  {formatPercentage(dashboardSnapshot.entropyScore ?? 0, true)}
+                </DynamicColoredValue>
+              </CardValue>
+            </Card>
+          </HeaderCards>
+
+          {/* ===== Main Grid / Charts ===== */}
+          <MainGrid>
+            <ChartPlaceholder>
+              <PlotlyTrendChart
+                data={chartSceneGrowthOverTime}
+                text={{
+                  title: "Scene Growth Over Time",
+                  x: {
+                    text: "Time",
+                    format: "%H:%M:%S", // or "%b %d %H:%M" if date-based
+                  },
+                  y: {
+                    text: "Scene Complexity",
+                    suffix: "", // no unit, just counts
+                  },
+                }}
+                disableDragZoom={false}
+              />
+            </ChartPlaceholder>
+            <ChartPlaceholder>
+              <PlotlyTrendChart
+                data={chartActionDensity}
+                text={{
+                  title: "Action Density Over Time",
+                  x: {
+                    text: "Time (per minute)",
+                    format: "%H:%M",
+                  },
+                  y: {
+                    text: "Actions per Minute",
+                  },
+                }}
+                disableDragZoom={false}
+              />
+            </ChartPlaceholder>
+            <ChartPlaceholder>
+              <PlotlyPieChart
+                data={chartActionTypePie}
+                title="Distribution of Actions by Type"
+              />
+            </ChartPlaceholder>
+
+            <ChartPlaceholder>
+              <PlotlyPieChart
+                data={chartAuthenticityScorePie}
+                title="Authenticity Score vs Potential Issues"
+              />
+            </ChartPlaceholder>
+            <ChartPlaceholder>
+              <PlotlyTrendChart
+                data={chartEntropyTrend}
+                text={{
+                  title: "Action Entropy Over Time",
+                  x: {
+                    text: "Time",
+                    format: "%H:%M:%S", // or "%b %d %H:%M" for multi-day sessions
+                  },
+                  y: {
+                    text: "Action Entropy",
+                  },
+                }}
+                disableDragZoom={false}
+                smooth={false}
+              />
+            </ChartPlaceholder>
+
+            <ChartPlaceholder>
+              <PlotlyTrendChart
+                data={chartIdleTimeTraces}
+                text={{
+                  title: "Idle Periods Over Time",
+                  x: {
+                    text: "Time",
+                    format: "%H:%M:%S", // or "%b %d %H:%M" for long sessions
+                  },
+                  y: {
+                    text: "Idle Time",
+                    suffix: " sec",
+                  },
+                }}
+                disableDragZoom={false}
+                smooth={false}
+              />
+            </ChartPlaceholder>
+          </MainGrid>
+        </>
+      ),
+    },
+
+    {
+      id: "info-logs",
+      name: "Action Logs",
+      icon: LogIcon,
+      content: (
+        <>
+          <ActionLogViewer instance={instance} />
+        </>
+      ),
+    },
+
+    {
+      id: "info-settings",
+      name: "Settings",
+      icon: GearIcon,
+      content: (
+        <>
+          <SetupMajikBlenderEdu />
+        </>
+      ),
+    },
+  ];
+
+  return (
+    <RootContainer>
+      {/* ===== Tabs ===== */}
+
+      <DynamicPagedTab tabs={InformationTabs} position="left" />
+    </RootContainer>
+  );
+};
+
+export default DashboardMajikBlenderEdu;
+
+```
+
+
+---
+
+### API Reference
+
+---
+
+
+#### `MajikBlenderEdu` Class
+
+
+##### 1. Initialization & Parsing
+
+| Method                                                            | Inputs / Parameters                                                                                                  | Return Type                | Description / Purpose                                                                                            |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `initialize(json: object, teacherKey: string, studentId: string)` | `json` – decrypted action log JSON<br>`teacherKey` – AES key used for decryption<br>`studentId` – student identifier | `MajikBlenderEdu` instance | Constructs and validates a new Analyzer instance from decrypted logs. Prepares KPIs, charts, and internal state. |
+| `parseFromJSON(json: object)`                                     | `json` – previously serialized Analyzer state                                                                        | `MajikBlenderEdu` instance | Reconstructs a full Analyzer instance from serialized state (for batch processing or replay).                    |
+
+---
+
+##### 2. Integrity & Validation
+
+| Method                        | Inputs / Parameters | Return Type | Description / Purpose                                                                                          |
+| ----------------------------- | ------------------- | ----------- | -------------------------------------------------------------------------------------------------------------- |
+| `validateGenesis()`           | None                | `boolean`   | Confirms correct teacher-student binding in the logs; returns `true` if genesis entry is valid.                |
+| `validateLogChain()`          | None                | `boolean`   | Verifies that the logs’ cryptographic hashes are intact and in order; returns `true` if no tampering detected. |
+| `hasLogTamperingIndicators()` | None                | `boolean`   | High-level flag indicating potential log tampering, missing entries, or suspicious sequences.                  |
+
+---
+
+##### 3. Time & Session Metrics
+
+| Method                               | Inputs / Parameters                                       | Return Type                             | Description / Purpose                                           |
+| ------------------------------------ | --------------------------------------------------------- | --------------------------------------- | --------------------------------------------------------------- |
+| `getTotalWorkingTime()`              | None                                                      | `number` (seconds)                      | Returns total session duration including idle periods.          |
+| `getEffectiveWorkingTime()`          | None                                                      | `number` (seconds)                      | Returns session duration excluding idle gaps.                   |
+| `getIdleRatio()`                     | None                                                      | `number` (0–1)                          | Ratio of idle time vs. total working time.                      |
+| `getIdlePeriods(threshold?: number)` | `threshold` – minimum idle duration in seconds (optional) | `Array<{ start: number; end: number }>` | Returns exact timestamps of idle periods exceeding `threshold`. |
+
+---
+
+##### 4. Scene & Modeling Metrics
+
+| Method                                        | Inputs / Parameters                | Return Type                                                  | Description / Purpose                                                          |
+| --------------------------------------------- | ---------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| `getTotalVertices()`                          | None                               | `number`                                                     | Final vertex count in the scene.                                               |
+| `getTotalObjects()`                           | None                               | `number`                                                     | Final object count in the scene.                                               |
+| `getSceneGrowthOverTime()`                    | None                               | `Array<{ time: number; vertices: number; objects: number }>` | Timeline of scene complexity (vertices/objects) over session time.             |
+| `hasMeaningfulProgress(minVertices?: number)` | `minVertices` – optional threshold | `boolean`                                                    | Checks if student made minimum modeling progress.                              |
+| `detectAllImportJumps()`                      | None                               | `Array<{ time: number; importedObject: string }>`            | Detects sudden additions of objects/assets that may indicate external copying. |
+
+---
+
+##### 5. Behavioral Analysis
+
+| Method                                          | Inputs / Parameters          | Return Type                                            | Description / Purpose                                                           |
+| ----------------------------------------------- | ---------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| `getActionEntropy()`                            | None                         | `number`                                               | Workflow randomness metric; higher values indicate unusual or erratic patterns. |
+| `getRepetitiveActionBursts(threshold?: number)` | `threshold` – actions/minute | `Array<{ start: number; end: number; count: number }>` | Detects repeated sequences of actions beyond threshold.                         |
+| `getMostActiveObject()`                         | None                         | `string`                                               | Returns the object with the most actions applied during the session.            |
+
+---
+
+##### 6. Scoring & Verdicts
+
+| Method                   | Inputs / Parameters | Return Type          | Description / Purpose                                                                      |
+| ------------------------ | ------------------- | -------------------- | ------------------------------------------------------------------------------------------ |
+| `getAuthenticityScore()` | None                | `number` (0–100)     | Computes an explainable score for workflow authenticity.                                   |
+| `getFlags()`             | None                | `Array<string>`      | Returns a list of integrity warnings or behavioral flags.                                  |
+| `getEduHealth()`         | None                | `{ status: "healthy" | "warning"                                                                                  | "critical"; reasons: string[] }` | Returns overall session health assessment. |
+| `getAssessmentVerdict()` | None                | `string`             | Human-readable verdict summarizing session authenticity, progress, and integrity concerns. |
+
+---
+
+##### 7. Charts & Visualization (Plotly Data)
+
+| Method                            | Inputs / Parameters | Return Type     | Description / Purpose                        |
+| --------------------------------- | ------------------- | --------------- | -------------------------------------------- |
+| `getPlotlySceneGrowthOverTime()`  | None                | `Plotly.Data[]` | Vertices / objects over time.                |
+| `getPlotlyActionDensity()`        | None                | `Plotly.Data[]` | Actions-per-minute density chart.            |
+| `getPlotlyActionTypePie()`        | None                | `Plotly.Data[]` | Action-type distribution pie chart.          |
+| `getPlotlyEntropyTrend()`         | None                | `Plotly.Data[]` | Action entropy over time.                    |
+| `getPlotlyIdleTimeTraces()`       | None                | `Plotly.Data[]` | Idle periods timeline.                       |
+| `getPlotlyAuthenticityScorePie()` | None                | `Plotly.Data[]` | Pie chart showing score breakdown vs issues. |
+
+---
+
+##### 8. Export & Serialization
+
+| Method                                            | Inputs / Parameters  | Return Type | Description / Purpose                                                                               |
+| ------------------------------------------------- | -------------------- | ----------- | --------------------------------------------------------------------------------------------------- |
+| `getSummary()`                                    | None                 | `object`    | Aggregated KPIs, flags, metrics, and scores for dashboards or export.                               |
+| `toJSON()`                                        | None                 | `object`    | Serializable JSON representing current Analyzer state; can be reloaded later via `parseFromJSON()`. |
+| `exportCSV(options?: { includeFlags?: boolean })` | Optional CSV options | `string`    | Returns CSV string suitable for audits, research, or LMS integration.                               |
+
+---
+
+#### Types
+
+| **Name**                 | **Category** | **Description**                      | **Notes / Details**                                                                                                                                                                     |
+| ------------------------ | ------------ | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ISODateString`          | Type         | String representing an ISO 8601 date | `string` type alias                                                                                                                                                                     |
+| `MajikBlenderEduJSON`    | Interface    | Full log dataset for a student       | Contains `id`, `data` (`RawActionLogEntry[]`), `total_working_time`, `period`, `timestamp`, optional `secret_key` and `student_id`, plus `stats`                                        |
+| `RawActionLogJSON`       | Interface    | Raw log data structure               | Contains `data`, `status`, `total_working_time`, `period`, `stats` (`v`, `f`, `o`)                                                                                                      |
+| `LogPeriod`              | Interface    | Start/end of a logging period        | `start` and `end` as `ISODateString`                                                                                                                                                    |
+| `RawActionLogEntry`      | Interface    | Individual raw log entry             | `t` (timestamp number), `a` (action), `o` (object), `ot` (object type), `d` (details), `dt` (duration), `s` (stats: `v/f/o`), `ph` (previous hash)                                      |
+| `ActionLogEntry`         | Interface    | Processed log entry                  | `timestamp`, `actionType`, `name`, `type`, optional `details`, `duration`, `sceneStats`, `hash`                                                                                         |
+| `SceneStats`             | Interface    | Scene statistics                     | `vertex`, `face`, `object` counts                                                                                                                                                       |
+| `RawSceneStats`          | Interface    | Raw scene statistics                 | `v`, `f`, `o` counts                                                                                                                                                                    |
+| `HealthSeverity`         | Type         | Severity of log health               | `"healthy"                                                                                                                                                                              | "warning" | "critical"` |
+| `ActionLogHealth`        | Interface    | Health status of a log               | `status` (`HealthSeverity`) and array of `reasons`                                                                                                                                      |
+| `MajikBlenderEduSummary` | Interface    | Summary stats for a student/session  | Includes totals (`totalLogs`, `totalWorkingTime`, `effectiveTime`), idle stats, total vertices/objects, `mostActiveObject`, `actionCounts`, `score`, `flags`, `verdict`, `entropyScore` |
+| `DefaultColors`          | Interface    | Predefined colors                    | `green`, `red`, `blue`, `white`                                                                                                                                                         |
+
+---
+
+#### Utils / Functions
+
+| **Name**                                               | **Category** | **Description**                                      | **Notes**                                                             |
+| ------------------------------------------------------ | ------------ | ---------------------------------------------------- | --------------------------------------------------------------------- |
+| `fernetKeyFromString(password, salt)`                  | Crypto       | Generates Fernet-compatible key from password + salt | Uses PBKDF2 + SHA256, returns base64url                               |
+| `sha256Hex(data)`                                      | Crypto       | SHA256 hash of string, hex-encoded                   | Used internally for integrity & key derivation                        |
+| `aesEncrypt(metadata, key, salt)`                      | Crypto       | Encrypt JSON metadata using Fernet/AES               | Low-level; returns encoded string                                     |
+| `aesDecrypt(encryptedMetadata, key, salt)`             | Crypto       | Decrypt Fernet/AES metadata                          | Low-level; returns string                                             |
+| `encryptMetadata(metadata, key, salt)`                 | Crypto       | High-level encryption wrapper                        | Validates salt and hashes key before encryption                       |
+| `decryptMetadata(encryptedMetadata, key, salt)`        | Crypto       | High-level decryption wrapper                        | Returns parsed JSON object                                            |
+| `deepSortKeys(obj)`                                    | Helper       | Recursively sorts object keys                        | Used for canonical JSON before hashing                                |
+| `computeEntryHash(entry)`                              | Hashing      | Computes SHA256 hash for a `RawActionLogEntry`       | Excludes `ph` and normalizes `"dt":0 → 0.0`                           |
+| `generateGenesisKey(teacherKey, studentId)`            | Crypto       | Generates unique genesis key                         | Combines teacher key + studentId, SHA256 hash                         |
+| `validateGenesisKey(current, teacherKey, studentId)`   | Crypto       | Validates genesis key                                | Returns boolean                                                       |
+| `validateLogIntegrity(rawLogs, teacherKey, studentId)` | Crypto       | Validates sequential log hashes                      | Checks genesis + chain of entry hashes                                |
+| `calculateDuration(previousEntry?, currentEntry?)`     | Time         | Computes elapsed seconds between logs                | Safely returns 0 if invalid                                           |
+| `isSessionStartLog(entry)`                             | Helper       | Checks if entry is session start                     | `actionType="Session Started"`, `name="__SESSION__"`, `type="SYSTEM"` |
+
 
 ---
 
