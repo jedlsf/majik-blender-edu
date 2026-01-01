@@ -7,15 +7,18 @@ Nothing in this file is saved to the .blend.
 # RUNTIME CACHE (NOT SAVED)
 # --------------------------------------------------
 
-from typing import TypedDict, Dict, Any, List
+from typing import Optional, TypedDict, Dict, Any, List
+
 
 class SceneStats(TypedDict):
     v: int  # Vertex Count
     f: int  # Face Count
     o: int  # Object Count
 
+
 class ActionLogEntry(TypedDict):
     t: float  # timestamp
+    lu: Optional[float]
     a: str  # action_type
     o: str  # object_name
     ot: str  # object_type
@@ -33,7 +36,7 @@ _double_hash_key: str | None = None
 _last_object_state: dict = {}
 _transform_debounce: dict = {}
 _edit_debounce: dict = {}
-_log_dirty: bool = False
+
 _last_autosave_time: float = 0.0
 AUTOSAVE_INTERVAL: float = 5.0  # seconds
 
@@ -53,6 +56,11 @@ _runtime_logs: List[str] = []
 # Decrypted runtime logs (runtime-only, never saved)
 _runtime_logs_raw: List[ActionLogEntry] = []
 """Contains decrypted logs for runtime access. Not saved to .blend."""
+
+_pending_log: ActionLogEntry | None = None
+
+_log_dirty: bool = False
+"""Indicates whether the raw runtime logs has been modified."""
 
 
 _is_tampered: bool = False
@@ -85,9 +93,18 @@ def end_session():
     _session_active = False
 
 
-def mark_dirty():
+def mark_log_dirty():
     global _log_dirty
     _log_dirty = True
+
+
+def mark_log_synced():
+    global _log_dirty
+    _log_dirty = False
+
+
+def is_log_dirty() -> bool:
+    return _log_dirty
 
 
 def mark_tampered():
@@ -102,7 +119,7 @@ def is_tampered() -> bool:
 
 def clear_runtime():
     """Reset all runtime-only data."""
-    global _timer_start, _timer_elapsed, _double_hash_key, _last_object_state, _transform_debounce, _log_dirty, _last_autosave_time, _runtime_metadata, _runtime_logs, _runtime_logs_raw, _is_tampered, _known_objects, _last_modifiers, _edit_debounce, _session_active, _last_stats_time, _last_scene_stats
+    global _timer_start, _timer_elapsed, _double_hash_key, _last_object_state, _transform_debounce, _log_dirty, _last_autosave_time, _runtime_metadata, _runtime_logs, _runtime_logs_raw, _is_tampered, _known_objects, _last_modifiers, _edit_debounce, _session_active, _last_stats_time, _last_scene_stats, _pending_log
 
     _timer_start = None
     _timer_elapsed = 0.0
@@ -121,3 +138,4 @@ def clear_runtime():
     _session_active = False
     _last_stats_time = 0
     _last_scene_stats = {"v": 0, "f": 0, "o": 0}
+    _pending_log = None

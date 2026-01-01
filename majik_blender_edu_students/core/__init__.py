@@ -3,13 +3,12 @@ from .crypto import (
     is_crypto_available,
     install_crypto_wheel,
     encrypt_metadata,
-    decrypt_metadata
+    decrypt_metadata,
 )
 
 
 from .constants import (
     SCENE_SIGNATURE_MODE,
-    SCENE_LOGS,
     SCENE_TEACHER_DOUBLE_HASH,
     SCENE_STUDENT_ID_HASH,
     SCENE_ACTIVE_TIMER,
@@ -22,11 +21,12 @@ from .handlers import on_file_load
 from .runtime import (
     _runtime_metadata,
     _runtime_logs,
+    _runtime_logs_raw,
     _is_tampered,
     clear_runtime,
     is_tampered,
     mark_tampered,
-    mark_dirty,
+    mark_log_dirty,
 )
 
 from .timer import (
@@ -51,8 +51,6 @@ from .logging import (
     export_encrypted_logs,
     export_decrypted_logs,
     validate_log_integrity,
-    get_student_id_hash,
-    get_teacher_double_hash,
     get_security_mode,
 )
 
@@ -64,7 +62,6 @@ __all__ = [
     "encrypt_metadata",
     "timestamp_to_readable",
     "SCENE_SIGNATURE_MODE",
-    "SCENE_LOGS",
     "SCENE_TEACHER_DOUBLE_HASH",
     "SCENE_STUDENT_ID_HASH",
     "SCENE_ACTIVE_TIMER",
@@ -73,11 +70,12 @@ __all__ = [
     "on_file_load",
     "_runtime_metadata",
     "_runtime_logs",
+    "_runtime_logs_raw",
     "_is_tampered",
     "clear_runtime",
     "is_tampered",
     "mark_tampered",
-    "mark_dirty",
+    "mark_log_dirty",
     "get_total_time",
     "load_timer_from_scene",
     "save_timer_to_scene",
@@ -97,7 +95,5 @@ __all__ = [
     "export_encrypted_logs",
     "export_decrypted_logs",
     "validate_log_integrity",
-    "get_student_id_hash",
-    "get_teacher_double_hash",
     "get_security_mode",
 ]

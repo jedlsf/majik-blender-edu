@@ -1,23 +1,22 @@
 import bpy  # type: ignore
 import time
 import json
-import zlib
 import base64
 import hashlib
 import re
 
 from ..core import runtime
-from .crypto import decrypt_metadata, is_crypto_available, encrypt_metadata
+from ..core.text.session_log_controller import SessionLogController
 from .timer import save_timer_to_scene
 
 from .constants import (
-    SCENE_LOGS,
-    SCENE_STUDENT_ID_HASH,
-    SCENE_TEACHER_DOUBLE_HASH,
     SCENE_SIGNATURE_MODE,
 )
 
+from ..core.recovery import Recovery
+
 from typing import TypedDict, Dict, Any, List, Literal
+
 
 # --------------------------------------------------
 # TYPE DEFINITIONS
@@ -51,14 +50,15 @@ class ExportLogsResult(TypedDict):
     status: Literal["valid", "tampered"]
     total_working_time: int
     period: WorkingPeriod
+    stats: SceneStats
 
 
 # --------------------------------------------------
 # RUNTIME INITIALIZATION
 # --------------------------------------------------
 
-if not hasattr(runtime, "_runtime_logs"):
-    runtime._runtime_logs = []
+
+IDLE_THRESHOLD = 60.0  # Seconds of inactivity before force-committing
 
 if not hasattr(runtime, "_known_objects"):
     runtime._known_objects = set()
@@ -88,44 +88,6 @@ def get_security_mode(scene) -> str:
     return scene.get(SCENE_SIGNATURE_MODE, "AES")
 
 
-def get_student_id_hash(scene) -> str:
-    if SCENE_STUDENT_ID_HASH not in scene:
-        raise RuntimeError("Student ID hash missing from scene")
-    return scene[SCENE_STUDENT_ID_HASH]
-
-
-def get_teacher_double_hash(scene) -> str:
-    if SCENE_TEACHER_DOUBLE_HASH not in scene:
-        raise RuntimeError("Teacher integrity key missing from scene")
-    return scene[SCENE_TEACHER_DOUBLE_HASH]
-
-
-def encrypt_log_item(scene, item: dict) -> str:
-    mode = get_security_mode(scene)
-    salt_bytes = get_student_id_hash(scene).encode("utf-8")
-    key = get_teacher_double_hash(scene)
-
-    return encrypt_metadata(
-        metadata=item,
-        key=key,
-        salt_bytes=salt_bytes,
-        mode=mode,
-    )
-
-
-def decrypt_log_item(scene, encrypted_item: str) -> dict:
-    mode = get_security_mode(scene)
-    salt_bytes = get_student_id_hash(scene).encode("utf-8")
-    key = get_teacher_double_hash(scene)
-
-    return decrypt_metadata(
-        encrypted_metadata=encrypted_item,
-        key=key,
-        salt_bytes=salt_bytes,
-        mode=mode,
-    )
-
-
 # --------------------------------------------------
 # INTEGRITY HASHING
 # --------------------------------------------------
@@ -142,7 +104,6 @@ def compute_entry_hash(entry: dict) -> str:
 
 
 def validate_log_integrity(scene) -> bool:
-    sync_logs_decrypted(scene)
 
     logs = runtime._runtime_logs_raw
     if not logs:
@@ -176,30 +137,20 @@ def validate_log_integrity(scene) -> bool:
 
 
 # --------------------------------------------------
-# COMPRESSION FUNCTION
-# --------------------------------------------------
-
-
-def compress_logs(logs: list[str]) -> str:
-    raw = json.dumps(logs).encode("utf-8")
-    compressed = zlib.compress(raw, level=3)
-    return base64.b64encode(compressed).decode("utf-8")
-
-
-def decompress_logs(data: str) -> list[str]:
-    compressed = base64.b64decode(data.encode("utf-8"))
-    raw = zlib.decompress(compressed)
-    return json.loads(raw.decode("utf-8"))
-
-
-# --------------------------------------------------
 # EXPORT
 # --------------------------------------------------
 
 
 def export_decrypted_logs(scene) -> ExportLogsResult:
-    if not is_runtime_sync():
-        sync_logs_decrypted(scene)
+
+    finalize_and_commit_log()
+
+    if len(runtime._runtime_logs_raw) <= 0:
+        print("[EXPORT DECRYPTED LOGS] Reloading logs")
+        load_logs_from_scene(scene)
+
+    if runtime.is_log_dirty():
+        save_logs_to_scene(scene)
 
     valid = validate_log_integrity(scene)
 
@@ -208,43 +159,23 @@ def export_decrypted_logs(scene) -> ExportLogsResult:
         "status": "valid" if valid else "tampered",
         "total_working_time": get_total_work_time(),
         "period": get_working_period(),
+        "stats": get_total_scene_stats(scene),
     }
 
 
-def export_encrypted_logs(scene) -> list[str]:
-    if not runtime._runtime_logs:
-        load_logs_from_scene(scene)
-    return list(runtime._runtime_logs)
+def export_encrypted_logs(scene) -> str:
+    """
+    Export the session log as raw text from the Text datablock.
 
+    Returns:
+        str: The full text content of the session log.
+    """
+    # Ensure logs are loaded into runtime
+    load_logs_from_scene(scene)
 
-# --------------------------------------------------
-# SYNCING
-# --------------------------------------------------
-
-
-def is_runtime_sync() -> bool:
-    return len(runtime._runtime_logs_raw) == len(runtime._runtime_logs)
-
-
-def sync_index() -> int:
-    """Return the index to start syncing (encrypt/decrypt)"""
-    return min(len(runtime._runtime_logs_raw), len(runtime._runtime_logs))
-
-
-def sync_logs_encrypted(scene):
-    """Encrypt new raw log entries and append to _runtime_logs"""
-    start_idx = sync_index()
-    for entry in runtime._runtime_logs_raw[start_idx:]:
-        encrypted = encrypt_log_item(scene, entry)
-        runtime._runtime_logs.append(encrypted)
-
-
-def sync_logs_decrypted(scene):
-    """Decrypt new encrypted log entries and append to _runtime_logs_raw"""
-    start_idx = sync_index()
-    for encrypted in runtime._runtime_logs[start_idx:]:
-        decrypted = decrypt_log_item(scene, encrypted)
-        runtime._runtime_logs_raw.append(decrypted)
+    # Get raw text from the SessionLogController
+    text_content = SessionLogController.get_text_content()
+    return text_content
 
 
 # --------------------------------------------------
@@ -257,36 +188,150 @@ def add_log(
     object_name: str,
     object_type: str,
     action_details: dict = None,
-    duration: float = 0.0,
+    override_dt: float = None,  # Add this parameter
 ):
     scene = bpy.context.scene
 
     # Determine previous hash
     if runtime._runtime_logs_raw:
-        prev_hash = compute_entry_hash(runtime._runtime_logs_raw[-1])
+        prev_entry = runtime._runtime_logs_raw[-1]
+        prev_hash = compute_entry_hash(prev_entry)
     else:
-        # Genesis hash
+        prev_entry = None
         prev_hash = generate_genesis_key(
             teacher_key=scene.teacher_key,
             student_id=scene.student_id,
         )
 
+    current_time = round(time.time(), 3)
+    # Use the override_dt if provided (from aggregation),
+    # otherwise calculate it normally.
+    duration = (
+        override_dt
+        if override_dt is not None
+        else calculate_duration(prev_entry, {"t": current_time})
+    )
 
     entry: ActionLogEntry = {
-        "t": round(time.time(), 3),
+        "t": current_time,
         "a": action_type,
         "o": object_name,
         "ot": object_type,
         "d": action_details or {},
-        "dt": round(duration, 3),
+        "dt": duration,
         "s": get_scene_stats(scene),
         "ph": prev_hash,
     }
 
-
-
     runtime._runtime_logs_raw.append(entry)
-    runtime.mark_dirty()
+    runtime.mark_log_dirty()
+    print(f"[Majik Log] [New Log] {action_type} -> {object_name} ({object_type})")
+    # --- Recovery save ---
+    try:
+        recovery_instance = Recovery()
+        recovery_instance.save(scene=scene, mode=get_security_mode(scene))
+    except Exception as e:
+        print(f"[Recovery] Failed to save logs: {e}")
+
+
+def calculate_duration(
+    previous_entry: ActionLogEntry | None, current_entry: ActionLogEntry | None
+) -> float:
+    """
+    Calculate elapsed time in seconds between two log entries.
+    Returns 0 if previous or current entry is missing, or timestamps are invalid.
+    """
+    if not previous_entry or not current_entry:
+        return 0.0
+
+    prev_time = previous_entry.get("t")
+    curr_time = current_entry.get("t")
+
+    if not isinstance(prev_time, (int, float)) or not isinstance(
+        curr_time, (int, float)
+    ):
+        return 0.0
+
+    diff = curr_time - prev_time
+    return round(diff, 3) if diff > 0 else 0.0
+
+
+def add_log_aggregated(action_type, object_name, object_type, action_details=None):
+    """
+    Guarantees that identical actions are merged into a single 'session'.
+    If the context changes, the previous session is finalized immediately.
+    """
+    scene = bpy.context.scene
+    current_time = round(time.time(), 3)
+
+    pending = getattr(runtime, "_pending_log", None)
+
+    if pending:
+        # Calculate how long since the student last 'interacted' with this pending log
+        # We'll use a new 'last_update' key in the pending dict
+        last_update = pending.get("lu", pending["t"])
+        idle_time = current_time - last_update
+
+        # CHECK 1: Is the student continuing the EXACT same task?
+        is_same_task = (
+            pending["a"] == action_type
+            and pending["o"] == object_name
+            and pending["ot"] == object_type
+        )
+
+        # CHECK 2: Is the idle time too long? (Heartbeat check)
+        if is_same_task and idle_time < IDLE_THRESHOLD:
+            # Continue the session
+            pending["d"] = action_details or {}
+            pending["s"] = get_scene_stats(scene)
+            pending["lu"] = current_time  # Update the 'Last Updated' timestamp
+            return
+        else:
+            # Either task changed OR they were idle too long. Commit it.
+            finalize_and_commit_log()
+            print(f"[Majik Log] [Idle Commit] {pending['a']} -> {pending['o']} ({pending['ot']})")
+
+
+    # 2. Start a NEW session
+    runtime._pending_log = {
+        "t": current_time,
+        "lu": current_time,  # Last Update Time (for idle tracking)
+        "a": action_type,
+        "o": object_name,
+        "ot": object_type,
+        "d": action_details or {},
+        "dt": 0.0,  # Will be calculated upon finalization
+        "s": get_scene_stats(scene),
+        "ph": None,
+    }
+
+    print(f"[Majik Log] [New Pending Log] {action_type} -> {object_name} ({object_type})")
+
+
+def finalize_and_commit_log():
+    """
+    Calculates the final duration of the buffered action and
+    officially adds it to the cryptographically hashed log.
+    """
+    pending = getattr(runtime, "_pending_log", None)
+    if not pending:
+        return
+
+    # Calculate how long this specific action lasted
+    # This turns 50 'Edited Mesh' events into ONE entry with a 30s duration
+    last_active = pending.get("lu", pending["t"])
+    duration = round(last_active - pending["t"], 3)
+
+    # Use the existing add_log to handle the hashing and list insertion
+    add_log(
+        action_type=pending["a"],
+        object_name=pending["o"],
+        object_type=pending["ot"],
+        action_details=pending["d"],
+        override_dt=max(0.0, duration),
+    )
+
+    runtime._pending_log = None
 
 
 def generate_genesis_key(teacher_key: str, student_id: str) -> str:
@@ -321,7 +366,7 @@ def create_genesis_log(scene, genesis_hash: str):
     :return: The genesis hash if created, None if skipped
     """
     # If log already exists, return early
-    if hasattr(runtime, "_runtime_logs") and len(runtime._runtime_logs) >= 1:
+    if hasattr(runtime, "_runtime_logs_raw") and len(runtime._runtime_logs_raw) >= 1:
         return None
 
     # Create initial log entry
@@ -337,7 +382,7 @@ def create_genesis_log(scene, genesis_hash: str):
     }
 
     # Store in runtime logs
-    if not hasattr(runtime, "_runtime_logs"):
+    if not hasattr(runtime, "_runtime_logs_raw"):
         runtime._runtime_logs_raw = []
 
     runtime._runtime_logs_raw.append(entry)
@@ -358,15 +403,16 @@ def validate_genesis_log(scene, teacher_key: str, student_id: str) -> bool:
     :raises RuntimeError: If no logs exist or first log is missing 'ph'
     """
     # Load or ensure logs are in runtime
-    if not runtime._runtime_logs:
+    if not runtime._runtime_logs_raw:
+        print("[VALIDATE GENESIS LOG] Reloading logs")
         load_logs_from_scene(scene)
+        
 
-    if not runtime._runtime_logs:
+    if not runtime._runtime_logs_raw:
         raise RuntimeError("No log entries found; cannot validate genesis log")
 
     # Get the first log entry
-    first_encrypted = runtime._runtime_logs[0]
-    first_entry = decrypt_log_item(scene, first_encrypted)
+    first_entry = runtime._runtime_logs_raw[0]
 
     if "ph" not in first_entry:
         raise RuntimeError("First log entry missing 'ph' (genesis hash)")
@@ -377,22 +423,27 @@ def validate_genesis_log(scene, teacher_key: str, student_id: str) -> bool:
 
 
 def save_logs_to_scene(scene):
-    sync_logs_encrypted(scene)
-    compressed = compress_logs(runtime._runtime_logs)
-    scene[SCENE_LOGS] = compressed
+    """
+    Save the current runtime logs into a Blender Text datablock using SessionLogController.
+    """
+    print("[Logging] Saving runtime logs to Text datablock")
+
+    # Print raw logs
+    for log in runtime._runtime_logs_raw:
+        print(log)
+
+    SessionLogController.save_logs_to_text(
+        scene=scene, raw_logs=runtime._runtime_logs_raw
+    )
 
 
-def load_logs_from_scene(scene) -> list[str]:
-    data = scene.get(SCENE_LOGS)
-    if not data:
-        return []
-
-    logs = decompress_logs(data)
-    runtime._runtime_logs.clear()
-    runtime._runtime_logs.extend(logs)
-
-    # Sync new decrypted logs
-    sync_logs_decrypted(scene)
+def load_logs_from_scene(scene):
+    """
+    Load session logs from Text datablock into runtime._runtime_logs_raw
+    """
+    print("[Logging] Loading logs from Text datablock")
+    logs = SessionLogController.load_logs_from_text(scene=scene)
+    runtime._runtime_logs_raw = logs
     return logs
 
 
@@ -437,7 +488,7 @@ def detect_mesh_action(obj) -> str | None:
     # -------------------------------
     if obj.mode == "EDIT":
         last_edit = runtime._edit_debounce.get(name, 0)
-        if now - last_edit > 1.0:
+        if now - last_edit > 0.3:
             runtime._edit_debounce[name] = now
             return "Edited Mesh"
 
@@ -448,7 +499,7 @@ def detect_mesh_action(obj) -> str | None:
     last_state = runtime._last_object_state.get(name)
 
     last_transform = runtime._transform_debounce.get(name, 0)
-    if state != last_state and now - last_transform > 1:
+    if state != last_state and now - last_transform > 0.3:
         runtime._last_object_state[name] = state
         runtime._transform_debounce[name] = now
         return "Transformed Object"
@@ -469,7 +520,7 @@ def log_simple_action(obj):
     action = detect_mesh_action(obj)
     if not action:
         return
-    add_log(action_type=action, object_name=obj.name, object_type=obj.type)
+    add_log_aggregated(action_type=action, object_name=obj.name, object_type=obj.type)
 
 
 # --------------------------------------------------
@@ -498,7 +549,8 @@ def on_depsgraph_update(scene, depsgraph):
     for obj in updated_objs:
         action = detect_mesh_action(obj)  # detect once
         if action:
-            add_log(
+            print(f"[Depsgraph Monitor] {action} on {obj.name}")
+            add_log_aggregated(
                 action_type=action,
                 object_name=obj.name,
                 object_type=obj.type,
@@ -539,7 +591,7 @@ def operator_post_handler():
             if not prop.is_readonly
         }
 
-        add_log(
+        add_log_aggregated(
             action_type=f"Operator: {last_op.bl_idname}",
             object_name=obj.name,
             object_type=obj.type,
@@ -567,7 +619,7 @@ def log_import_post(context):
         else:
             method = "unknown"
 
-        add_log(
+        add_log_aggregated(
             action_type="Asset Added",
             object_name=obj.name,
             object_type=obj.type,
@@ -604,10 +656,10 @@ def log_session_event(
             "reason": reason,
             "timer_running": runtime._timer_start is not None,
         },
-        duration=0.0,
     )
 
     runtime._session_active = started
+    print(f"[Session Log] {action} | Active: {started}")
 
 
 def log_session_start(reason: str = "user_start"):
@@ -623,7 +675,7 @@ def log_session_start(reason: str = "user_start"):
 def log_session_stop(reason: str = "user_stop"):
     if not runtime.is_session_active():
         return  # prevent duplicate stops
-
+    finalize_and_commit_log()
     log_session_event(
         started=False,
         reason=reason,
@@ -633,7 +685,7 @@ def log_session_stop(reason: str = "user_stop"):
     save_timer_to_scene(scene)
 
 
-def get_scene_stats(scene) -> dict:
+def get_scene_stats(scene) -> SceneStats:
     now = time.time()
     last = getattr(runtime, "_last_stats_time", 0)
 
@@ -641,26 +693,68 @@ def get_scene_stats(scene) -> dict:
         return runtime._last_scene_stats
 
     stats_str = scene.statistics(bpy.context.view_layer)
-    print("[DEBUG] Scene statistics string:", stats_str)
 
-    # Allow commas in numbers
-    verts_match = re.search(r"Verts:([\d,]+)", stats_str)
-    faces_match = re.search(r"Faces:([\d,]+)", stats_str)
-    objects_match = re.search(r"Objects:([\d,]+)", stats_str)
+    def extract_denominator(pattern: str) -> int:
+        """
+        Extracts the denominator if format is 'num/den', else returns the number itself.
+        """
+        match = re.search(pattern, stats_str)
+        if not match:
+            return 0
+        val = match.group(1).replace(",", "")
+        if "/" in val:
+            return int(val.split("/")[1])
+        return int(val)
 
-    if not verts_match or not faces_match or not objects_match:
-        print("[DEBUG] Regex match failed for scene stats")
-        verts = faces = objects = 0
-    else:
-        # Remove commas before converting to int
-        verts = int(verts_match.group(1).replace(",", ""))
-        faces = int(faces_match.group(1).replace(",", ""))
-        objects = int(objects_match.group(1).replace(",", ""))
+    verts = extract_denominator(r"Verts:([\d/,]+)")
+    faces = extract_denominator(r"Faces:([\d/,]+)")
+    objects = extract_denominator(r"Objects:([\d/,]+)")
 
     stats = {"v": verts, "f": faces, "o": objects}
 
     runtime._last_scene_stats = stats
     runtime._last_stats_time = now
+    return stats
+
+
+def get_total_scene_stats(scene) -> SceneStats:
+    """
+    Computes total vertices, faces, and objects in the scene,
+    INCLUDING modifiers (evaluated mesh).
+    """
+    now = time.time()
+    last = getattr(runtime, "_last_total_stats_time", 0)
+
+    if now - last < 1.0:
+        return runtime._last_total_scene_stats
+
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+
+    total_verts = 0
+    total_faces = 0
+    total_objects = 0
+
+    for obj in scene.objects:
+        if obj.type != "MESH":
+            continue
+
+        eval_obj = obj.evaluated_get(depsgraph)
+        eval_mesh = eval_obj.to_mesh(
+            preserve_all_data_layers=False, depsgraph=depsgraph
+        )
+
+        if eval_mesh:
+            total_verts += len(eval_mesh.vertices)
+            total_faces += len(eval_mesh.polygons)
+            total_objects += 1
+
+            # IMPORTANT: free evaluated mesh
+            eval_obj.to_mesh_clear()
+
+    stats = {"v": total_verts, "f": total_faces, "o": total_objects}
+
+    runtime._last_total_scene_stats = stats
+    runtime._last_total_stats_time = now
     return stats
 
 
@@ -718,6 +812,14 @@ def operator_monitor(scene):
         log_simple_action(obj)
 
     now = time.time()
+    # --- IDLE CHECK ---
+    pending = getattr(runtime, "_pending_log", None)
+    if pending:
+        last_update = pending.get("lu", pending["t"])
+        if (now - last_update) > IDLE_THRESHOLD:
+            print(f"[Majik] Idle timeout reached for {pending['a']}. Committing.")
+            finalize_and_commit_log()
+
     if now - runtime._last_autosave_time >= runtime.AUTOSAVE_INTERVAL:
         save_timer_to_scene(scene)
         runtime._last_autosave_time = now
@@ -725,12 +827,12 @@ def operator_monitor(scene):
 
 def on_save_pre(filepath: str):
     scene = bpy.context.scene
+    finalize_and_commit_log()
     add_log(
         action_type="File Saved",
         object_name="__SYSTEM__",
         object_type="SYSTEM",
         action_details={"filepath": filepath},
-        duration=0.0,
     )
     save_logs_to_scene(scene)
     save_timer_to_scene(scene)

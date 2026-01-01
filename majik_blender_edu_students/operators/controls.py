@@ -3,7 +3,7 @@ from bpy_extras.io_utils import ExportHelper  # type: ignore
 
 import json
 
-from ..core.constants import SCENE_LOGS, SCENE_TEACHER_DOUBLE_HASH
+from ..core.constants import SCENE_TEACHER_DOUBLE_HASH
 
 from ..core.timer import start_timer, stop_timer, load_timer_from_scene
 
@@ -22,6 +22,7 @@ from .overlay import register_overlay, unregister_overlay
 
 from ..core import runtime
 
+from ..core.text.session_log_controller import SessionLogController
 
 # --------------------------------------------------
 # OPERATORS
@@ -69,12 +70,17 @@ class STUDENT_OT_start_stop(bpy.types.Operator):
             self.report({"ERROR"}, "Student ID required")
             return {"CANCELLED"}
 
-        if SCENE_TEACHER_DOUBLE_HASH not in scene or SCENE_LOGS not in scene:
+        logFile = SessionLogController.get_text_content()
+
+        if (
+            SCENE_TEACHER_DOUBLE_HASH not in scene
+            or not logFile.strip()
+        ):
             self.report({"ERROR"}, "Encrypted submission not found")
             return {"CANCELLED"}
 
+        print("[STUDENT OT START STOP] Reloading logs and timer")
         # Load persisted data once
-        load_logs_from_scene(scene)
         load_timer_from_scene(scene)
 
         if runtime._timer_start is None:

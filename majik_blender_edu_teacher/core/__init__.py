@@ -14,7 +14,6 @@ from .hash import (
 from .constants import (
     SCENE_ENCRYPTED_KEY,
     SCENE_SIGNATURE_MODE,
-    SCENE_LOGS,
     SCENE_TEACHER_DOUBLE_HASH,
     SCENE_SIGNATURE_VERSION,
     SCENE_STUDENT_ID_HASH,
@@ -27,9 +26,10 @@ from .handlers import on_file_load
 from .runtime import (
     _runtime_metadata,
     _runtime_logs,
+    _runtime_logs_raw,
     clear_runtime,
     _is_tampered,
-    mark_dirty,
+    mark_log_dirty,
     mark_tampered,
 )
 
@@ -39,8 +39,6 @@ from .logging import (
     export_encrypted_logs,
     export_decrypted_logs,
     validate_log_integrity,
-    get_student_id_hash,
-    get_teacher_double_hash,
     get_security_mode,
 )
 
@@ -54,7 +52,6 @@ __all__ = [
     "timestamp_to_readable",
     "SCENE_ENCRYPTED_KEY",
     "SCENE_SIGNATURE_MODE",
-    "SCENE_LOGS",
     "SCENE_TEACHER_DOUBLE_HASH",
     "SCENE_SIGNATURE_VERSION",
     "SCENE_STUDENT_ID_HASH",
@@ -63,8 +60,9 @@ __all__ = [
     "on_file_load",
     "_runtime_metadata",
     "_runtime_logs",
+    "_runtime_logs_raw",
     "_is_tampered",
-    "mark_dirty",
+    "mark_log_dirty",
     "mark_tampered",
     "clear_runtime",
     "load_logs_from_scene",
@@ -72,7 +70,5 @@ __all__ = [
     "export_encrypted_logs",
     "export_decrypted_logs",
     "validate_log_integrity",
-    "get_student_id_hash",
-    "get_teacher_double_hash",
     "get_security_mode",
 ]

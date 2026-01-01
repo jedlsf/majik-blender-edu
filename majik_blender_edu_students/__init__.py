@@ -14,6 +14,7 @@ bl_info = {
 import os
 import bpy  # type: ignore
 import sys
+from .core import runtime
 
 _ADDON_DIR = os.path.dirname(__file__)
 _VENDOR_DIR = os.path.join(_ADDON_DIR, "_vendor")
@@ -31,7 +32,41 @@ def try_install_crypto():
     return None  # stop the timer
 
 
+def restore_logs_on_start():
+
+    from .core.recovery import Recovery
+    from .core.constants import SCENE_SIGNATURE_MODE
+
+    if runtime._runtime_logs_raw:
+        return  # Already loaded
+    scene = bpy.context.scene
+
+    if scene is None:
+        print("[Recovery] No active scene; skipping log restore")
+        return
+
+    try:
+        secMode = scene.get(SCENE_SIGNATURE_MODE, "AES")
+        restored = Recovery.restore(scene=scene, mode=secMode)
+        if restored:
+            print(f"[Recovery] Restored {len(restored)} logs from previous session")
+        else:
+            # No recovery file, start fresh
+            print("[Recovery] No previous logs found")
+    except Exception as e:
+        print(f"[Recovery] Failed to restore logs: {e}")
+
+
+def safe_restore_logs():
+    try:
+        restore_logs_on_start()
+    except Exception as e:
+        print(f"[Recovery] Could not restore logs yet: {e}")
+    return None  # timers need this
+
+
 bpy.app.timers.register(try_install_crypto)
+bpy.app.timers.register(safe_restore_logs)
 
 # --------------------------------------------------
 # IMPORTS
@@ -42,7 +77,6 @@ from .core.handlers import on_file_load
 from .operators import *
 from .ui import *
 from .core.logging import (
-    on_depsgraph_update,
     register_logging_handlers,
     unregister_logging_handlers,
 )
@@ -75,12 +109,18 @@ classes = [
 
 
 def register():
+    # Ensure runtime logs exist
+    if not hasattr(runtime, "_runtime_logs_raw"):
+        runtime._runtime_logs_raw = []
+
     register_properties()
     register_logging_handlers()
+
     for cls in classes:
         bpy.utils.register_class(cls)
 
-    bpy.app.handlers.load_post.append(on_file_load)
+    if on_file_load not in bpy.app.handlers.load_post:
+        bpy.app.handlers.load_post.append(on_file_load)
 
 
 def unregister():

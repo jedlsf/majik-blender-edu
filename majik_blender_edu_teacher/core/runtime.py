@@ -24,10 +24,11 @@ class ActionLogEntry(TypedDict):
 
 
 _log_dirty: bool = False
+"""Indicates whether the raw runtime logs has been modified."""
 
 
 _last_stats_time: int = 0
-_last_scene_stats = {"v": 0, "f": 0, "o": 0}
+_last_scene_stats: SceneStats = {"v": 0, "f": 0, "o": 0}
 
 
 # Decrypted submission metadata (teacher-only)
@@ -42,14 +43,24 @@ _runtime_logs: List[str] = []
 _runtime_logs_raw: List[ActionLogEntry] = []
 """Contains decrypted logs for runtime access. Not saved to .blend."""
 
+_pending_log: ActionLogEntry | None = None
 
 _is_tampered: bool = False
 """Indicates whether the submission has been tampered with."""
 
 
-def mark_dirty():
+def mark_log_dirty():
     global _log_dirty
     _log_dirty = True
+
+
+def mark_log_synced():
+    global _log_dirty
+    _log_dirty = False
+
+
+def is_log_dirty() -> bool:
+    return _log_dirty
 
 
 def mark_tampered():
@@ -64,10 +75,12 @@ def is_tampered() -> bool:
 
 def clear_runtime():
     """Reset all runtime-only data."""
-    global _runtime_metadata, _runtime_logs, _is_tampered, _runtime_logs_raw, _last_scene_stats, _last_stats_time
+    global _runtime_metadata, _runtime_logs, _is_tampered, _runtime_logs_raw, _last_scene_stats, _last_stats_time, _pending_log, _log_dirty
     _is_tampered = False
     _runtime_metadata = None
     _runtime_logs.clear()
     _runtime_logs_raw.clear()
     _last_stats_time = 0
     _last_scene_stats = {"v": 0, "f": 0, "o": 0}
+    _pending_log = None
+    _log_dirty = False

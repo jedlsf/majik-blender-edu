@@ -22,10 +22,11 @@ from ..core.constants import (
     SCENE_TEACHER_DOUBLE_HASH,
     SCENE_ENCRYPTED_KEY,
     SCENE_SIGNATURE_VERSION,
-    SCENE_LOGS,
     SCENE_STUDENT_ID_HASH,
     SCENE_SIGNATURE_MODE,
 )
+
+from ..core.text.session_log_controller import SessionLogController
 
 from ..core import runtime
 
@@ -67,11 +68,15 @@ class SIGNATURE_OT_encrypt(bpy.types.Operator):
     @classmethod
     def poll(cls, context):
         scene = context.scene
+
+        logFile = SessionLogController.get_text_content()
+
         # Only allow encrypt if:
         # - XOR mode is selected
         # OR AES mode and cryptography is available
         return (
             bool(scene.teacher_key.strip())
+            and not bool(logFile.strip())
             and bool(scene.student_id.strip())
             and (
                 scene.security_mode == "XOR"
@@ -241,11 +246,10 @@ class SIGNATURE_OT_reset_submission(bpy.types.Operator):
 
         scene.pop(SCENE_ENCRYPTED_KEY, None)
         scene.pop(SCENE_SIGNATURE_VERSION, None)
-        scene.pop(SCENE_LOGS, None)
         scene.pop(SCENE_STUDENT_ID_HASH, None)
         scene.pop(SCENE_TEACHER_DOUBLE_HASH, None)
         scene.pop(SCENE_SIGNATURE_MODE, None)
-
+        SessionLogController.clear_logs()
         runtime._runtime_metadata = None
         runtime.clear_runtime()
 

@@ -1,15 +1,17 @@
 import bpy  # type: ignore
 
 
-from ..core.constants import SCENE_LOGS, SCENE_TEACHER_DOUBLE_HASH
+from ..core.constants import SCENE_TEACHER_DOUBLE_HASH
 
-from ..core.timer import  load_timer_from_scene, get_timer_label
+from ..core.timer import load_timer_from_scene, get_timer_label
 
 from ..core.crypto import is_crypto_available
 
 from ..core import runtime
 
 from ..core.logging import get_total_work_time
+
+from ..core.text.session_log_controller import SessionLogController
 
 # --------------------------------------------------
 # PANEL
@@ -29,11 +31,14 @@ class STUDENT_PT_panel(bpy.types.Panel):
 
         layout.prop(scene, "student_id", text="Student ID")
 
+        logFile = SessionLogController.get_text_content()
+
         enabled = (
-            SCENE_LOGS in scene
+            bool(logFile.strip())
             and SCENE_TEACHER_DOUBLE_HASH in scene
             and bool(scene.student_id.strip())
         )
+
         mode = scene.get("_signature_mode", "XOR")
 
         # ERROR CASE: AES mode but crypto is missing
