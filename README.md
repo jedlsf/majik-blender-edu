@@ -271,7 +271,7 @@ The Blender extensions are licensed under the **GNU General Public License v3.0 
 > ⚠️ **Note for educators and institutions:** If you modify and redistribute the Blender addon (internally or externally), those changes must remain open-source under the same GPL license.
 
 ### 2. Majik Blender Edu Analyzer & SDK
-The Analyzer web tool and the [`@thezelijah/majik-blender-edu-analyzer`](https://www.npmjs.com/package/@thezelijah/majik-blob) NPM package are licensed under the **Apache License 2.0**.
+The Analyzer web tool and the [`@thezelijah/majik-blender-edu-analyzer`](https://www.npmjs.com/package/@thezelijah/majik-blender-edu-analyzer) NPM package are licensed under the **Apache License 2.0**.
 * This is a permissive license that allows for broader integration into various software environments, including commercial and proprietary projects.
 * This ensures developers can build custom dashboards or automated grading systems using our logic without GPL restrictions.
 * See the [LICENSE-APACHE](LICENSE-APACHE) file for full details (or visit the [Apache 2.0 Official Site](https://www.apache.org/licenses/LICENSE-2.0)).

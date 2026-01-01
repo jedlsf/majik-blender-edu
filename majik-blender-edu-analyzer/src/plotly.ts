@@ -70,3 +70,65 @@ export interface BarChartTrace {
   orientation?: "v" | "h"; // vertical or horizontal bars (default "v")
 }
 
+export function createLineTrace(params: {
+  x: Array<string>;
+  y: number[];
+  name: string;
+  hovertemplate: string;
+  markerSize?: number;
+}): TimeSeriesTrace {
+  return {
+    type: "scatter",
+    mode: "lines+markers",
+    x: params.x,
+    y: params.y,
+    name: params.name,
+    marker: { size: params.markerSize ?? 6 },
+    hovertemplate: params.hovertemplate,
+  };
+}
+
+export function createBarTrace(params: {
+  x: string[];
+  y: number[];
+  name: string;
+  color?: string;
+  hovertemplate: string;
+}): BarChartTrace {
+  const trace: BarChartTrace = {
+    type: "bar",
+    name: params.name,
+    x: params.x,
+    y: params.y,
+    marker: params.color ? { color: params.color } : undefined,
+    hovertemplate: params.hovertemplate,
+  };
+
+  if (params.color) {
+    trace.marker = { color: params.color };
+  }
+
+  return trace;
+}
+
+export function createPieTrace(params: {
+  labels: string[];
+  values: number[];
+  name: string;
+  colors?: string[];
+  hovertemplate: string;
+}): PieChartTrace {
+  const trace: PieChartTrace = {
+    type: "pie",
+    name: params.name,
+    labels: params.labels,
+    values: params.values,
+    hovertemplate: params.hovertemplate,
+  };
+
+  if (params.colors) {
+    trace.marker = { color: params.colors };
+  }
+
+  return trace;
+}

@@ -9,15 +9,25 @@ import {
   HealthSeverity,
   ActionLogHealth,
   MajikBlenderEduSummary,
+  SceneStats,
+  RawSceneStats,
 } from "./types";
 import {
   calculateDuration,
   computeEntryHash,
+  DEFAULT_COLORS,
   generateGenesisKey,
   isSessionStartLog,
   validateLogIntegrity,
 } from "./utils";
-import { BarChartTrace, PieChartTrace, TimeSeriesTrace } from "./plotly";
+import {
+  BarChartTrace,
+  createBarTrace,
+  createLineTrace,
+  createPieTrace,
+  PieChartTrace,
+  TimeSeriesTrace,
+} from "./plotly";
 
 export class MajikBlenderEdu {
   private id: string;
@@ -28,12 +38,14 @@ export class MajikBlenderEdu {
   private total_working_time: number;
   private secret_key?: string;
   private student_id?: string;
+  private sceneStats: SceneStats;
 
   constructor(
     id: string = autogenerateID("mjkbedu"),
     logs: ActionLogEntry[] = [],
     raw_logs: RawActionLogEntry[] = [],
     period: LogPeriod,
+    sceneStats: RawSceneStats,
     time: number = 0,
     timestamp: string = new Date().toISOString(),
     secret_key?: string,
@@ -43,6 +55,11 @@ export class MajikBlenderEdu {
     this.logs = logs;
     this._raw_logs = raw_logs;
     this.period = period;
+    this.sceneStats = {
+      vertex: sceneStats.v,
+      face: sceneStats.f,
+      object: sceneStats.o,
+    };
     this.total_working_time = time;
     this.timestamp = timestamp;
     this.secret_key = secret_key;
@@ -133,6 +150,7 @@ export class MajikBlenderEdu {
       logs,
       rawJSON.data,
       rawJSON.period,
+      rawJSON.stats,
       rawJSON.total_working_time,
       timestamp,
       secretKey,
@@ -406,10 +424,7 @@ export class MajikBlenderEdu {
    * @returns Total vertex count
    */
   public getTotalVertices(): number {
-    return this.logs.reduce(
-      (acc, log) => acc + (log.sceneStats.vertex ?? 0),
-      0
-    );
+    return this.sceneStats.vertex;
   }
 
   /**
@@ -417,10 +432,7 @@ export class MajikBlenderEdu {
    * @returns Total object count
    */
   public getTotalObjects(): number {
-    return this.logs.reduce(
-      (acc, log) => acc + (log.sceneStats.object ?? 0),
-      0
-    );
+    return this.sceneStats.object;
   }
 
   /**
@@ -784,16 +796,12 @@ export class MajikBlenderEdu {
     const data = this.getSceneGrowthOverTime();
 
     return [
-      {
+      createLineTrace({
         x: data.map((d) => d.time),
         y: data.map((d) => d.vertices),
-        type: "scatter",
-        mode: "lines+markers",
         name: "Vertices",
-
-        marker: { size: 6 },
         hovertemplate: "%{x}<br>Vertices: %{y}<extra></extra>",
-      },
+      }),
     ];
   }
 
@@ -802,41 +810,42 @@ export class MajikBlenderEdu {
    */
   public getPlotlyActionDensity(): TimeSeriesTrace[] {
     const density = this.getActionDensityPerMinute();
+
     return [
-      {
+      createLineTrace({
         x: Object.keys(density),
         y: Object.values(density),
-        type: "scatter",
-        mode: "lines+markers",
         name: "Actions per Minute",
-
-        marker: { size: 6 },
         hovertemplate: "%{x}<br>Actions: %{y}<extra></extra>",
-      },
+      }),
     ];
   }
 
   /**
    * Bar chart showing count of each action type.
    */
-  public getPlotlyActionCountBar(): BarChartTrace[] {
+  public getPlotlyActionCountBar(
+    color: string = DEFAULT_COLORS.blue
+  ): BarChartTrace[] {
     const counts = this.getActionCounts();
     return [
-      {
-        type: "bar",
+      createBarTrace({
         name: "Action Counts",
         x: Object.keys(counts),
         y: Object.values(counts),
-        marker: { color: "rgb(100,149,237)" },
+        color: color,
         hovertemplate: "%{x}: %{y}<extra></extra>",
-      },
+      }),
     ];
   }
 
   /**
    * Bar chart showing most active objects by number of logs.
    */
-  public getPlotlyMostActiveObjectsBar(topN = 10): BarChartTrace[] {
+  public getPlotlyMostActiveObjectsBar(
+    topN = 10,
+    color: string = DEFAULT_COLORS.green
+  ): BarChartTrace[] {
     const counts: Record<string, number> = {};
     this.logs.forEach((log) => {
       counts[log.name] = (counts[log.name] ?? 0) + 1;
@@ -847,15 +856,14 @@ export class MajikBlenderEdu {
       .slice(0, topN);
 
     return [
-      {
-        type: "bar",
+      createBarTrace({
         name: "Most Active Objects",
         x: sorted.map(([name]) => name),
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         y: sorted.map(([_, count]) => count),
-        marker: { color: "rgb(60,179,113)" },
+        color: color,
         hovertemplate: "%{x}: %{y}<extra></extra>",
-      },
+      }),
     ];
   }
 
@@ -871,16 +879,20 @@ export class MajikBlenderEdu {
         return acc;
       }, {});
 
-    if (!Object.keys(counts).length) return [];
+    const filteredCounts = Object.fromEntries(
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      Object.entries(counts).filter(([_, v]) => v > 0)
+    );
+
+    if (!Object.keys(filteredCounts).length) return [];
 
     return [
-      {
-        type: "pie",
+      createPieTrace({
+        name: "Action Types",
         labels: Object.keys(counts),
         values: Object.values(counts),
-        name: "Action Types",
         hovertemplate: "%{label}: %{value} (%{percent})<extra></extra>",
-      },
+      }),
     ];
   }
 
@@ -898,13 +910,12 @@ export class MajikBlenderEdu {
     if (health.status) statusCount[health.status] = 1;
 
     return [
-      {
-        type: "pie",
+      createPieTrace({
         labels: Object.keys(statusCount),
         values: Object.values(statusCount),
         name: "Health Status",
         hovertemplate: "%{label}: %{value}<extra></extra>",
-      },
+      }),
     ];
   }
 
@@ -918,32 +929,31 @@ export class MajikBlenderEdu {
     if (!idlePeriods.length) return [];
 
     return [
-      {
+      createLineTrace({
         x: timestamps,
         y: idlePeriods,
-        type: "scatter",
-        mode: "lines+markers",
         name: "Idle Periods (sec)",
-        marker: { size: 6 },
         hovertemplate: "%{x}<br>Idle: %{y} sec<extra></extra>",
-      },
+      }),
     ];
   }
 
   /**
    * Stacked bar chart showing cumulative action durations per action type
    */
-  public getPlotlyActionDurationsBar(): BarChartTrace[] {
+  public getPlotlyActionDurationsBar(
+    color: string = DEFAULT_COLORS.green
+  ): BarChartTrace[] {
     const durations = this.getActionDurations();
+
     return [
-      {
-        type: "bar",
+      createBarTrace({
         name: "Action Durations (sec)",
         x: Object.keys(durations),
         y: Object.values(durations),
-        marker: { color: "rgb(255,165,0)" }, // orange
+        color: color,
         hovertemplate: "%{x}: %{y} sec<extra></extra>",
-      },
+      }),
     ];
   }
 
@@ -980,22 +990,21 @@ export class MajikBlenderEdu {
     if (!timestamps.length) return [];
 
     return [
-      {
+      createLineTrace({
         x: timestamps,
         y: entropies,
-        type: "scatter",
-        mode: "lines+markers",
         name: "Action Entropy",
-        marker: { size: 6 },
         hovertemplate: "%{x}<br>Entropy: %{y}<extra></extra>",
-      },
+      }),
     ];
   }
 
   /**
    * Bar chart showing repetitive action bursts
    */
-  public getPlotlyRepetitiveActionBurstsBar(): BarChartTrace[] {
+  public getPlotlyRepetitiveActionBurstsBar(
+    color: string = DEFAULT_COLORS.red
+  ): BarChartTrace[] {
     const bursts = this.getRepetitiveActionBursts();
     if (!bursts.length) return [];
 
@@ -1003,40 +1012,42 @@ export class MajikBlenderEdu {
     bursts.forEach((a) => (counts[a] = (counts[a] ?? 0) + 1));
 
     return [
-      {
-        type: "bar",
+      createBarTrace({
         name: "Repetitive Action Bursts",
         x: Object.keys(counts),
         y: Object.values(counts),
-        marker: { color: "rgb(220,20,60)" }, // crimson
         hovertemplate: "%{x}: %{y} bursts<extra></extra>",
-      },
+        color: color,
+      }),
     ];
   }
 
   /**
    * Pie chart showing authenticity score vs potential issues
    */
-  public getPlotlyAuthenticityScorePie(): PieChartTrace[] {
+  public getPlotlyAuthenticityScorePie(
+    colors: string[] = [DEFAULT_COLORS.green, DEFAULT_COLORS.red]
+  ): PieChartTrace[] {
     const score = this.getAuthenticityScore();
     const remaining = 100 - score;
 
     return [
-      {
-        type: "pie",
+      createPieTrace({
         labels: ["Score", "Issues"],
         values: [score, remaining],
-        name: "Authenticity Score",
-        marker: { color: ["rgb(60,179,113)", "rgb(255,69,0)"] }, // green/red
+        colors: colors,
+        name: "Health Status",
         hovertemplate: "%{label}: %{value}<extra></extra>",
-      },
+      }),
     ];
   }
 
   /**
    * Bar chart showing flags detected (if any)
    */
-  public getPlotlySuspiciousFlagsBar(): BarChartTrace[] {
+  public getPlotlySuspiciousFlagsBar(
+    color: string = DEFAULT_COLORS.red
+  ): BarChartTrace[] {
     const flags = this.detectSuspiciousPatterns();
     if (!flags.length) return [];
 
@@ -1044,14 +1055,13 @@ export class MajikBlenderEdu {
     flags.forEach((f) => (counts[f] = (counts[f] ?? 0) + 1));
 
     return [
-      {
-        type: "bar",
+      createBarTrace({
         name: "Detected Flags",
         x: Object.keys(counts),
         y: Object.values(counts),
-        marker: { color: "rgb(255,140,0)" }, // dark orange
         hovertemplate: "%{x}: %{y}<extra></extra>",
-      },
+        color: color,
+      }),
     ];
   }
 
@@ -1083,6 +1093,11 @@ export class MajikBlenderEdu {
       logs,
       rawParse?.data,
       rawParse.period,
+      {
+        v: rawParse.stats.vertex,
+        f: rawParse.stats.face,
+        o: rawParse.stats.object,
+      },
       rawParse?.total_working_time,
       rawParse?.timestamp,
       rawParse?.secret_key,
@@ -1103,6 +1118,7 @@ export class MajikBlenderEdu {
       data: this._raw_logs,
       secret_key: this.secret_key,
       student_id: this.student_id,
+      stats: this.sceneStats,
     };
   }
 

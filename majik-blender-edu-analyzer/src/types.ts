@@ -8,6 +8,7 @@ export interface MajikBlenderEduJSON {
   timestamp: ISODateString;
   secret_key?: string;
   student_id?: string;
+  stats: SceneStats;
 }
 
 export interface RawActionLogJSON {
@@ -15,6 +16,11 @@ export interface RawActionLogJSON {
   status: string;
   total_working_time: number;
   period: LogPeriod;
+  stats: {
+    v: number;
+    f: number;
+    o: number;
+  };
 }
 
 export interface LogPeriod {
@@ -54,6 +60,12 @@ export interface SceneStats {
   vertex: number;
   face: number;
   object: number;
+}
+
+export interface RawSceneStats {
+  v: number;
+  f: number;
+  o: number;
 }
 
 export type HealthSeverity = "healthy" | "warning" | "critical";

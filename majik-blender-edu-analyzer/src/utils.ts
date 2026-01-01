@@ -2,7 +2,6 @@
 import crypto from "crypto";
 import Fernet from "fernet";
 import { ActionLogEntry, RawActionLogEntry } from "./types";
-import { Buffer } from "buffer";
 
 // ---------------------------
 // UTILS
@@ -114,8 +113,6 @@ function deepSortKeys(obj: any): any {
   return obj;
 }
 
-
-
 export function computeEntryHash(entry: RawActionLogEntry): string {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { ph, ...rest } = entry;
@@ -177,7 +174,6 @@ export function validateLogIntegrity(
   return true;
 }
 
-
 /**
  * Calculates elapsed time in seconds between two log entries.
  * Returns 0 if previous entry is missing or timestamps are invalid.
@@ -205,4 +201,18 @@ export function isSessionStartLog(entry: ActionLogEntry): boolean {
     entry.name === "__SESSION__" &&
     entry.type === "SYSTEM"
   );
+}
+
+export const DEFAULT_COLORS: DefaultColors = {
+  green: "#d6f500",
+  red: "#ed3500",
+  blue: "#00339f",
+  white: "#f7f7f7",
+};
+
+export interface DefaultColors {
+  green: string;
+  red: string;
+  blue: string;
+  white: string;
 }
