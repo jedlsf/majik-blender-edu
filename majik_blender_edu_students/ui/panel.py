@@ -5,7 +5,7 @@ from ..core.constants import SCENE_TEACHER_DOUBLE_HASH
 
 from ..core.timer import load_timer_from_scene, get_timer_label
 
-from ..core.crypto import is_crypto_available
+
 
 from ..core import runtime
 
@@ -41,28 +41,18 @@ class STUDENT_PT_panel(bpy.types.Panel):
 
         mode = scene.get("_signature_mode", "XOR")
 
-        # ERROR CASE: AES mode but crypto is missing
-        if mode == "AES" and not is_crypto_available():
-            layout.label(
-                text="This project is encrypted with AES and its dependencies are missing.",
+        if enabled:
+            row = layout.row()
+            row.enabled = enabled
+            buttonLabel = get_timer_label()
+            icon = "PAUSE" if runtime._timer_start else "PLAY"
+            row.operator("main.start_stop", text=buttonLabel, icon=icon)
+        else:
+            box = layout.box()
+            box.label(
+                text="Please set a Student ID and ensure the file is prepared by the teacher.",
                 icon="ERROR",
             )
-            layout.operator("main.prompt_install_crypto", icon="IMPORT")
-
-        # NORMAL CASE: AES + crypto OK OR not AES
-        else:
-            if enabled:
-                row = layout.row()
-                row.enabled = enabled
-                buttonLabel = get_timer_label()
-                icon = "PAUSE" if runtime._timer_start else "PLAY"
-                row.operator("main.start_stop", text=buttonLabel, icon=icon)
-            else:
-                box = layout.box()
-                box.label(
-                    text="Please set a Student ID and ensure the file is prepared by the teacher.",
-                    icon="ERROR",
-                )
 
         layout.separator()
         layout.label(text=f"Total Work Time: {get_total_work_time():.1f} seconds")

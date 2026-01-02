@@ -3,15 +3,17 @@ import time
 import json
 import base64
 import hashlib
-
+import re
 
 from ..core import runtime
 from ..core.text.session_log_controller import SessionLogController
+from .timer import save_timer_to_scene
 
 from .constants import (
     SCENE_SIGNATURE_MODE,
 )
 
+from ..core.recovery import Recovery
 
 from typing import TypedDict, Dict, Any, List, Literal
 
@@ -55,6 +57,8 @@ class ExportLogsResult(TypedDict):
 # RUNTIME INITIALIZATION
 # --------------------------------------------------
 
+
+IDLE_THRESHOLD = 60.0  # Seconds of inactivity before force-committing
 
 if not hasattr(runtime, "_known_objects"):
     runtime._known_objects = set()
@@ -139,7 +143,10 @@ def validate_log_integrity(scene) -> bool:
 
 def export_decrypted_logs(scene) -> ExportLogsResult:
 
+    finalize_and_commit_log()
+
     if len(runtime._runtime_logs_raw) <= 0:
+        print("[EXPORT DECRYPTED LOGS] Reloading logs")
         load_logs_from_scene(scene)
 
     if runtime.is_log_dirty():
@@ -169,6 +176,162 @@ def export_encrypted_logs(scene) -> str:
     # Get raw text from the SessionLogController
     text_content = SessionLogController.get_text_content()
     return text_content
+
+
+# --------------------------------------------------
+# LOGGING FUNCTION
+# --------------------------------------------------
+
+
+def add_log(
+    action_type: str,
+    object_name: str,
+    object_type: str,
+    action_details: dict = None,
+    override_dt: float = None,  # Add this parameter
+):
+    scene = bpy.context.scene
+
+    # Determine previous hash
+    if runtime._runtime_logs_raw:
+        prev_entry = runtime._runtime_logs_raw[-1]
+        prev_hash = compute_entry_hash(prev_entry)
+    else:
+        prev_entry = None
+        prev_hash = generate_genesis_key(
+            teacher_key=scene.teacher_key,
+            student_id=scene.student_id,
+        )
+
+    current_time = round(time.time(), 3)
+    # Use the override_dt if provided (from aggregation),
+    # otherwise calculate it normally.
+    duration = (
+        override_dt
+        if override_dt is not None
+        else calculate_duration(prev_entry, {"t": current_time})
+    )
+
+    entry: ActionLogEntry = {
+        "t": current_time,
+        "a": action_type,
+        "o": object_name,
+        "ot": object_type,
+        "d": action_details or {},
+        "dt": duration,
+        "s": get_scene_stats(scene),
+        "ph": prev_hash,
+    }
+
+    runtime._runtime_logs_raw.append(entry)
+    runtime.mark_log_dirty()
+    print(f"[Majik Log] [New Log] {action_type} -> {object_name} ({object_type})")
+    # --- Recovery save ---
+    try:
+        recovery_instance = Recovery()
+        recovery_instance.save(scene=scene, mode=get_security_mode(scene))
+    except Exception as e:
+        print(f"[Recovery] Failed to save logs: {e}")
+
+
+def calculate_duration(
+    previous_entry: ActionLogEntry | None, current_entry: ActionLogEntry | None
+) -> float:
+    """
+    Calculate elapsed time in seconds between two log entries.
+    Returns 0 if previous or current entry is missing, or timestamps are invalid.
+    """
+    if not previous_entry or not current_entry:
+        return 0.0
+
+    prev_time = previous_entry.get("t")
+    curr_time = current_entry.get("t")
+
+    if not isinstance(prev_time, (int, float)) or not isinstance(
+        curr_time, (int, float)
+    ):
+        return 0.0
+
+    diff = curr_time - prev_time
+    return round(diff, 3) if diff > 0 else 0.0
+
+
+def add_log_aggregated(action_type, object_name, object_type, action_details=None):
+    """
+    Guarantees that identical actions are merged into a single 'session'.
+    If the context changes, the previous session is finalized immediately.
+    """
+    scene = bpy.context.scene
+    current_time = round(time.time(), 3)
+
+    pending = getattr(runtime, "_pending_log", None)
+
+    if pending:
+        # Calculate how long since the student last 'interacted' with this pending log
+        # We'll use a new 'last_update' key in the pending dict
+        last_update = pending.get("lu", pending["t"])
+        idle_time = current_time - last_update
+
+        # CHECK 1: Is the student continuing the EXACT same task?
+        is_same_task = (
+            pending["a"] == action_type
+            and pending["o"] == object_name
+            and pending["ot"] == object_type
+        )
+
+        # CHECK 2: Is the idle time too long? (Heartbeat check)
+        if is_same_task and idle_time < IDLE_THRESHOLD:
+            # Continue the session
+            pending["d"] = action_details or {}
+            pending["s"] = get_scene_stats(scene)
+            pending["lu"] = current_time  # Update the 'Last Updated' timestamp
+            return
+        else:
+            # Either task changed OR they were idle too long. Commit it.
+            finalize_and_commit_log()
+            print(f"[Majik Log] [Idle Commit] {pending['a']} -> {pending['o']} ({pending['ot']})")
+
+
+    # 2. Start a NEW session
+    runtime._pending_log = {
+        "t": current_time,
+        "lu": current_time,  # Last Update Time (for idle tracking)
+        "a": action_type,
+        "o": object_name,
+        "ot": object_type,
+        "d": action_details or {},
+        "dt": 0.0,  # Will be calculated upon finalization
+        "s": get_scene_stats(scene),
+        "ph": None,
+    }
+
+    print(f"[Majik Log] [New Pending Log] {action_type} -> {object_name} ({object_type})")
+
+
+def finalize_and_commit_log():
+    """
+    Calculates the final duration of the buffered action and
+    officially adds it to the cryptographically hashed log.
+    """
+    pending = getattr(runtime, "_pending_log", None)
+    if not pending:
+        return
+
+    # Calculate how long this specific action lasted
+    # This turns 50 'Edited Mesh' events into ONE entry with a 30s duration
+    last_active = pending.get("lu", pending["t"])
+    duration = round(last_active - pending["t"], 3)
+
+    # Use the existing add_log to handle the hashing and list insertion
+    add_log(
+        action_type=pending["a"],
+        object_name=pending["o"],
+        object_type=pending["ot"],
+        action_details=pending["d"],
+        override_dt=max(0.0, duration),
+    )
+
+    runtime._pending_log = None
 
 
 def generate_genesis_key(teacher_key: str, student_id: str) -> str:
@@ -241,7 +404,9 @@ def validate_genesis_log(scene, teacher_key: str, student_id: str) -> bool:
     """
     # Load or ensure logs are in runtime
     if not runtime._runtime_logs_raw:
+        print("[VALIDATE GENESIS LOG] Reloading logs")
         load_logs_from_scene(scene)
+        
 
     if not runtime._runtime_logs_raw:
         raise RuntimeError("No log entries found; cannot validate genesis log")
@@ -262,6 +427,11 @@ def save_logs_to_scene(scene):
     Save the current runtime logs into a Blender Text datablock using SessionLogController.
     """
     print("[Logging] Saving runtime logs to Text datablock")
+
+    # Print raw logs
+    for log in runtime._runtime_logs_raw:
+        print(log)
+
     SessionLogController.save_logs_to_text(
         scene=scene, raw_logs=runtime._runtime_logs_raw
     )
@@ -275,6 +445,276 @@ def load_logs_from_scene(scene):
     logs = SessionLogController.load_logs_from_text(scene=scene)
     runtime._runtime_logs_raw = logs
     return logs
+
+
+# --------------------------------------------------
+# DETECT GENERAL MESH CHANGES
+# --------------------------------------------------
+
+
+def detect_mesh_action(obj) -> str | None:
+    """
+    Detects mesh changes with minimal overhead.
+    Returns a string describing the action or None.
+    """
+
+    now = time.time()
+    name = obj.name
+
+    # -------------------------------
+    # 1. New object detection
+    # -------------------------------
+    if name not in runtime._known_objects:
+        runtime._known_objects.add(name)
+        if obj.type == "MESH":
+            prim_type = obj.get("primitive_type", "Mesh")
+            runtime._last_object_state[name] = _get_object_state(obj)
+            return f"Added {prim_type}"
+
+    # -------------------------------
+    # 2. Modifier added
+    # -------------------------------
+    last_mods = runtime._last_modifiers.get(name)
+    current_mods = {mod.name for mod in obj.modifiers}
+
+    if last_mods is None:
+        runtime._last_modifiers[name] = current_mods
+    elif added_mods := current_mods - last_mods:
+        runtime._last_modifiers[name] = current_mods
+        return f"Added Modifier: {', '.join(sorted(added_mods))}"
+
+    # -------------------------------
+    # 3. Edit mode debounce
+    # -------------------------------
+    if obj.mode == "EDIT":
+        last_edit = runtime._edit_debounce.get(name, 0)
+        if now - last_edit > 0.3:
+            runtime._edit_debounce[name] = now
+            return "Edited Mesh"
+
+    # -------------------------------
+    # 4. Transform debounce
+    # -------------------------------
+    state = _get_object_state(obj)
+    last_state = runtime._last_object_state.get(name)
+
+    last_transform = runtime._transform_debounce.get(name, 0)
+    if state != last_state and now - last_transform > 0.3:
+        runtime._last_object_state[name] = state
+        runtime._transform_debounce[name] = now
+        return "Transformed Object"
+
+    return None
+
+
+def _get_object_state(obj):
+    """Cache-friendly tuple state of object location/rotation/scale rounded to 0.1"""
+    return (
+        tuple(round(v, 1) for v in obj.location),
+        tuple(round(v, 1) for v in obj.rotation_euler),
+        tuple(round(v, 1) for v in obj.scale),
+    )
+
+
+def log_simple_action(obj):
+    action = detect_mesh_action(obj)
+    if not action:
+        return
+    add_log_aggregated(action_type=action, object_name=obj.name, object_type=obj.type)
+
+
+# --------------------------------------------------
+# DEPSGRAPH MONITOR
+# --------------------------------------------------
+def on_depsgraph_update(scene, depsgraph):
+    """Optimized depsgraph update handler for logging mesh, curve, and armature changes."""
+    if bpy.app.background or runtime._timer_start is None:
+        return
+
+    updated_objs: set[bpy.types.Object] = set()
+
+    # Collect all relevant updated objects
+    for update in depsgraph.updates:
+        obj = getattr(update, "id", None)
+        if isinstance(obj, bpy.types.Object) and obj.type in {
+            "MESH",
+            "CURVE",
+            "ARMATURE",
+        }:
+            updated_objs.add(obj)
+
+    now = time.time()
+
+    # Log actions for each updated object only once
+    for obj in updated_objs:
+        action = detect_mesh_action(obj)  # detect once
+        if action:
+            print(f"[Depsgraph Monitor] {action} on {obj.name}")
+            add_log_aggregated(
+                action_type=action,
+                object_name=obj.name,
+                object_type=obj.type,
+            )
+
+    # Autosave timer + logs every N seconds
+    if now - runtime._last_autosave_time >= runtime.AUTOSAVE_INTERVAL:
+        save_timer_to_scene(scene)
+        runtime._last_autosave_time = now
+
+
+# --------------------------------------------------
+# OPERATOR POST HANDLER
+# --------------------------------------------------
+def handle_object_update(obj):
+    log_simple_action(obj)
+    operator_post_handler()
+
+
+def operator_post_handler():
+    if runtime._timer_start is None:
+        return
+
+    context = bpy.context
+    obj = context.active_object
+    if not obj or obj.type != "MESH":
+        return
+
+    op = getattr(context.window_manager, "operators", None)
+    if not op:
+        return
+
+    last_op = op[-1] if op else None
+    if last_op and last_op.bl_idname.startswith("MESH_OT"):
+        details = {
+            prop.identifier: getattr(last_op.properties, prop.identifier)
+            for prop in last_op.properties.bl_rna.properties
+            if not prop.is_readonly
+        }
+
+        add_log_aggregated(
+            action_type=f"Operator: {last_op.bl_idname}",
+            object_name=obj.name,
+            object_type=obj.type,
+            action_details=details,
+        )
+
+
+def log_import_post(context):
+    if runtime._timer_start is None:
+        return
+
+    op = (
+        bpy.context.window_manager.operators[-1]
+        if bpy.context.window_manager.operators
+        else None
+    )
+
+    for obj in context.objects:
+        if obj.library is not None:
+            method = "link"
+        elif op and op.bl_idname == "WM_OT_append":
+            method = "append"
+        elif op and op.bl_idname.startswith("IMPORT_SCENE_"):
+            method = "import"
+        else:
+            method = "unknown"
+
+        add_log_aggregated(
+            action_type="Asset Added",
+            object_name=obj.name,
+            object_type=obj.type,
+            action_details={
+                "method": method,
+                "source_file": context.filepath,
+                "linked": obj.library is not None,
+                "library": obj.library.filepath if obj.library else None,
+                "collection": (
+                    obj.users_collection[0].name if obj.users_collection else None
+                ),
+            },
+        )
+
+
+def log_session_event(
+    *,
+    started: bool,
+    reason: str = "",
+):
+    """
+    Log a session (timer) start or stop event.
+    This is a chain-critical audit entry.
+    """
+
+    action = "Session Started" if started else "Session Stopped"
+
+    add_log(
+        action_type=action,
+        object_name="__SESSION__",
+        object_type="SYSTEM",
+        action_details={
+            "started": started,
+            "reason": reason,
+            "timer_running": runtime._timer_start is not None,
+        },
+    )
+
+    runtime._session_active = started
+    print(f"[Session Log] {action} | Active: {started}")
+
+
+def log_session_start(reason: str = "user_start"):
+    if runtime.is_session_active():
+        return  # prevent duplicate starts
+
+    log_session_event(
+        started=True,
+        reason=reason,
+    )
+
+
+def log_session_stop(reason: str = "user_stop"):
+    if not runtime.is_session_active():
+        return  # prevent duplicate stops
+    finalize_and_commit_log()
+    log_session_event(
+        started=False,
+        reason=reason,
+    )
+    scene = bpy.context.scene
+    save_logs_to_scene(scene)
+    save_timer_to_scene(scene)
+
+
+def get_scene_stats(scene) -> SceneStats:
+    now = time.time()
+    last = getattr(runtime, "_last_stats_time", 0)
+
+    if now - last < 1.0:
+        return runtime._last_scene_stats
+
+    stats_str = scene.statistics(bpy.context.view_layer)
+
+    def extract_denominator(pattern: str) -> int:
+        """
+        Extracts the denominator if format is 'num/den', else returns the number itself.
+        """
+        match = re.search(pattern, stats_str)
+        if not match:
+            return 0
+        val = match.group(1).replace(",", "")
+        if "/" in val:
+            return int(val.split("/")[1])
+        return int(val)
+
+    verts = extract_denominator(r"Verts:([\d/,]+)")
+    faces = extract_denominator(r"Faces:([\d/,]+)")
+    objects = extract_denominator(r"Objects:([\d/,]+)")
+
+    stats = {"v": verts, "f": faces, "o": objects}
+
+    runtime._last_scene_stats = stats
+    runtime._last_stats_time = now
+    return stats
 
 
 def get_total_scene_stats(scene) -> SceneStats:
@@ -356,3 +796,67 @@ def get_working_period() -> WorkingPeriod:
     end_iso = datetime.fromtimestamp(end_item.get("t", 0)).isoformat()
 
     return {"start": start_iso, "end": end_iso}
+
+
+# --------------------------------------------------
+# AUTOSAVE + SIMPLE MONITOR
+# --------------------------------------------------
+
+
+def operator_monitor(scene):
+    if runtime._timer_start is None:
+        return
+
+    obj = bpy.context.active_object
+    if obj and obj.type in {"MESH", "CURVE", "ARMATURE"}:
+        log_simple_action(obj)
+
+    now = time.time()
+    # --- IDLE CHECK ---
+    pending = getattr(runtime, "_pending_log", None)
+    if pending:
+        last_update = pending.get("lu", pending["t"])
+        if (now - last_update) > IDLE_THRESHOLD:
+            print(f"[Majik] Idle timeout reached for {pending['a']}. Committing.")
+            finalize_and_commit_log()
+
+    if now - runtime._last_autosave_time >= runtime.AUTOSAVE_INTERVAL:
+        save_timer_to_scene(scene)
+        runtime._last_autosave_time = now
+
+
+def on_save_pre(filepath: str):
+    scene = bpy.context.scene
+    finalize_and_commit_log()
+    add_log(
+        action_type="File Saved",
+        object_name="__SYSTEM__",
+        object_type="SYSTEM",
+        action_details={"filepath": filepath},
+    )
+    save_logs_to_scene(scene)
+    save_timer_to_scene(scene)
+    print(f"[Majik] Logs and timer saved before saving {filepath}")
+
+
+# --------------------------------------------------
+# REGISTER / UNREGISTER
+# --------------------------------------------------
+
+
+def register_logging_handlers():
+    if on_depsgraph_update not in bpy.app.handlers.depsgraph_update_post:
+        bpy.app.handlers.depsgraph_update_post.append(on_depsgraph_update)
+    if log_import_post not in bpy.app.handlers.blend_import_post:
+        bpy.app.handlers.blend_import_post.append(log_import_post)
+    if on_save_pre not in bpy.app.handlers.save_pre:
+        bpy.app.handlers.save_pre.append(on_save_pre)
+
+
+def unregister_logging_handlers():
+    if on_depsgraph_update in bpy.app.handlers.depsgraph_update_post:
+        bpy.app.handlers.depsgraph_update_post.remove(on_depsgraph_update)
+    if log_import_post in bpy.app.handlers.blend_import_post:
+        bpy.app.handlers.blend_import_post.remove(log_import_post)
+    if on_save_pre in bpy.app.handlers.save_pre:
+        bpy.app.handlers.save_pre.remove(on_save_pre)

@@ -12,8 +12,6 @@ from ..core.logging import (
 
 
 from ..core.crypto import (
-    install_crypto_wheel,
-    is_crypto_available,
     decrypt_metadata,
     encrypt_metadata,
 )
@@ -30,31 +28,6 @@ from ..core.text.session_log_controller import SessionLogController
 
 from ..core import runtime
 
-# --------------------------------------------------
-# CRYPTO INSTALLER OPERATOR
-# --------------------------------------------------
-
-
-class SIGNATURE_OT_prompt_install_crypto(bpy.types.Operator):
-    bl_idname = "main.prompt_install_crypto"
-    bl_label = "Install Dependencies"
-    bl_description = "Install cryptography for AES encryption"
-
-    def invoke(self, context, event):
-        return context.window_manager.invoke_confirm(self, event)
-
-    def execute(self, context):
-        success = install_crypto_wheel(self.report)
-
-        if success:
-            self.report(
-                {"INFO"},
-                "Cryptography installed.",
-            )
-            return {"FINISHED"}
-
-        self.report({"ERROR"}, "Cryptography installation failed. Check console.")
-        return {"CANCELLED"}
 
 
 # -------------------------------
@@ -78,10 +51,6 @@ class SIGNATURE_OT_encrypt(bpy.types.Operator):
             bool(scene.teacher_key.strip())
             and not bool(logFile.strip())
             and bool(scene.student_id.strip())
-            and (
-                scene.security_mode == "XOR"
-                or (scene.security_mode == "AES" and is_crypto_available())
-            )
         )
 
     def execute(self, context):
@@ -167,7 +136,6 @@ class SIGNATURE_OT_decrypt(bpy.types.Operator):
         return (
             bool(scene.teacher_key.strip())
             and SCENE_ENCRYPTED_KEY in scene
-            and (mode == "XOR" or (mode == "AES" and is_crypto_available()))
         )
 
     def execute(self, context):

@@ -4,16 +4,54 @@ from ..core import *
 
 from ..core import runtime
 
+from ..core.constants import SCENE_TEACHER_DOUBLE_HASH
+
+from ..core.timer import load_timer_from_scene, get_timer_label
+
+
+from ..core.logging import get_total_work_time
+
+from ..core.text.session_log_controller import SessionLogController
+
+
 # --------------------------------------------------
-# PANEL
+# USER MODE PANEL
 # --------------------------------------------------
 
 
-class SIGNATURE_PT_panel(bpy.types.Panel):
+class MAJIK_PT_mode_selector(bpy.types.Panel):
+    bl_label = "Majik Blender Edu (Mode Selector)"
+    bl_space_type = "PROPERTIES"
+    bl_region_type = "WINDOW"
+    bl_context = "scene"
+
+    @classmethod
+    def poll(cls, context):
+        return hasattr(context.scene, "user_mode")
+
+    def draw(self, context):
+        layout = self.layout
+        scene = context.scene
+
+        layout.prop(scene, "user_mode", expand=True)
+
+
+# --------------------------------------------------
+# TEACHER PANEL
+# --------------------------------------------------
+
+
+class TEACHER_PT_panel(bpy.types.Panel):
     bl_label = "Majik Blender Edu – Teacher"
     bl_space_type = "PROPERTIES"
     bl_region_type = "WINDOW"
     bl_context = "scene"
+
+    @classmethod
+    def poll(cls, context):
+        return (
+            hasattr(context.scene, "user_mode") and context.scene.user_mode == "TEACHER"
+        )
 
     def draw(self, context):
         layout = self.layout
@@ -50,14 +88,6 @@ class SIGNATURE_PT_panel(bpy.types.Panel):
             row.operator("main.import_key")
 
             layout.prop(scene, "security_mode", text="Security Mode")
-
-            # If AES is selected but missing, show install button
-            if scene.security_mode == "AES":
-                if is_crypto_available():
-                    layout.label(text="AES successfully installed.", icon="CHECKMARK")
-                else:
-                    layout.label(text="AES not available.", icon="ERROR")
-                    layout.operator("main.prompt_install_crypto", icon="IMPORT")
 
             layout.operator("main.encrypt", icon="CHECKMARK")
 
@@ -103,3 +133,57 @@ class SIGNATURE_PT_panel(bpy.types.Panel):
                 # NEW: Reset button with confirmation
                 layout.separator()
                 layout.operator("main.reset_submission", icon="TRASH")
+
+
+# --------------------------------------------------
+# STUDENT PANEL
+# --------------------------------------------------
+
+
+class STUDENT_PT_panel(bpy.types.Panel):
+    bl_label = "Majik Blender Edu – Student"
+    bl_space_type = "PROPERTIES"
+    bl_region_type = "WINDOW"
+    bl_context = "scene"
+
+    @classmethod
+    def poll(cls, context):
+        return (
+            hasattr(context.scene, "user_mode") and context.scene.user_mode == "STUDENT"
+        )
+
+    def draw(self, context):
+        layout = self.layout
+        scene = context.scene
+        load_timer_from_scene(scene)
+
+        layout.prop(scene, "student_id", text="Student ID")
+
+        logFile = SessionLogController.get_text_content()
+
+        enabled = (
+            bool(logFile.strip())
+            and SCENE_TEACHER_DOUBLE_HASH in scene
+            and bool(scene.student_id.strip())
+        )
+
+        if enabled:
+            row = layout.row()
+            row.enabled = enabled
+            buttonLabel = get_timer_label()
+            icon = "PAUSE" if runtime._timer_start else "PLAY"
+            row.operator("main.start_stop", text=buttonLabel, icon=icon)
+        else:
+            box = layout.box()
+            box.label(
+                text="Please set a Student ID and ensure the file is prepared by the teacher.",
+                icon="ERROR",
+            )
+
+        layout.separator()
+        layout.label(text=f"Total Work Time: {get_total_work_time():.1f} seconds")
+        layout.label(text=f"Total Logs: {len(runtime._runtime_logs_raw)} entries")
+
+        export_row = layout.row()
+        export_row.enabled = enabled
+        export_row.operator("main.export_encrypted_logs", icon="EXPORT")

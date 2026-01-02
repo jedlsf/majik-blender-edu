@@ -4,8 +4,6 @@ import base64
 import json
 
 
-
-
 # --------------------------------------------------
 # UTILS
 # --------------------------------------------------
@@ -22,8 +20,6 @@ def fernet_key_from_string(password: str, salt: bytes) -> bytes:
     :return: The Fernet-compatible key
     :rtype: bytes
     """
-    if not is_crypto_available():
-        raise RuntimeError("cryptography is not available")
 
     import base64
     from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -43,19 +39,31 @@ def install_crypto_wheel(report_fn=None):
     Install bundled cryptography + dependencies wheels into _vendor folder.
     report_fn: optional function like operator.report
     """
-    import platform
-    import subprocess
-    import traceback
-    import os
-    import sys
 
     def log(msg, level="INFO"):
         print(f"[CRYPTO INSTALL][{level}] {msg}")
         if report_fn:
             report_fn({level}, msg)
 
+    if is_crypto_installed():
+        log("Dependencies already installed. Skipping installation.")
+        return
+
+    import platform
+    import subprocess
+    import traceback
+    import os
+    import sys
+
     try:
+
         log("Starting cryptography wheel installation")
+
+        _ADDON_DIR = os.path.dirname(__file__)
+        _VENDOR_DIR = os.path.join(_ADDON_DIR, "_vendor")
+
+        if os.path.isdir(_VENDOR_DIR) and _VENDOR_DIR not in sys.path:
+            sys.path.insert(0, _VENDOR_DIR)
 
         addon_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
         wheel_dir = os.path.join(addon_root, "wheels")
@@ -184,6 +192,21 @@ def install_crypto_wheel(report_fn=None):
 # --------------------------------------------------
 
 
+def is_crypto_installed():
+    """
+    Returns True if the 'cryptography' package is already installed, False otherwise.
+    """
+    try:
+        import importlib
+
+        importlib.invalidate_caches()
+        import cryptography
+
+        return True
+    except Exception:
+        return False
+
+
 def xor_obfuscate(data: str, key: str) -> str:
     """
     Obfuscate data using XOR with the given key.
@@ -194,8 +217,10 @@ def xor_obfuscate(data: str, key: str) -> str:
     """
     # Use SHA256 of the key consistently as bytes
     key_bytes = hashlib.sha256(key.encode()).digest()
-    encrypted = bytes(b ^ key_bytes[i % len(key_bytes)] for i, b in enumerate(data.encode('utf-8')))
-    return base64.b64encode(encrypted).decode('ascii')
+    encrypted = bytes(
+        b ^ key_bytes[i % len(key_bytes)] for i, b in enumerate(data.encode("utf-8"))
+    )
+    return base64.b64encode(encrypted).decode("ascii")
 
 
 def xor_deobfuscate(data: str, key: str) -> str:
@@ -210,23 +235,7 @@ def xor_deobfuscate(data: str, key: str) -> str:
     key_bytes = hashlib.sha256(key.encode()).digest()
     raw = base64.b64decode(data)
     decrypted = bytes(b ^ key_bytes[i % len(key_bytes)] for i, b in enumerate(raw))
-    return decrypted.decode('utf-8')  # force string
-
-
-
-def is_crypto_available():
-    """
-    Returns True if the 'cryptography' package is available, False otherwise.
-    """
-    try:
-        import importlib
-
-        importlib.invalidate_caches()
-        import cryptography
-
-        return True
-    except Exception:
-        return False
+    return decrypted.decode("utf-8")  # force string
 
 
 # ---------------------------
@@ -343,5 +352,3 @@ def decrypt_metadata(
         raise ValueError(f"Unknown decryption mode: {mode}")
 
     return json.loads(decrypted)
-
-

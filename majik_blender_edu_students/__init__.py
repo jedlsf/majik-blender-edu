@@ -93,8 +93,9 @@ class MAJIK_OT_addon_prefs(bpy.types.AddonPreferences):
         layout.label(text="Majik Blender Edu – For Students Addon Preferences")
 
         if not is_crypto_available():
-            layout.label(text="Cryptography package not installed!", icon="ERROR")
-            layout.operator("main.prompt_install_crypto", icon="IMPORT")
+            layout.label(
+                text="Cryptography package not installed properly.", icon="ERROR"
+            )
         else:
             layout.label(text="All dependencies satisfied.", icon="CHECKMARK")
 

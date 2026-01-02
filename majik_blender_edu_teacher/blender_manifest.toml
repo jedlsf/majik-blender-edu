@@ -5,8 +5,8 @@ schema_version = "1.0.0"
 id = "majik_blender_edu_teacher"
 
 
-version = "1.1.0"
-name = "Majik Blender Edu - Teacher"
+version = "1.1.1"
+name = "Majik Blender Edu"
 tagline = "Submission integrity tool for educators to verify students' work"
 maintainer = "Zelijah"
 
@@ -30,7 +30,7 @@ website = "https://thezelijah.world/tools/education-majik-blender-edu"
 documentation = "https://github.com/jedlsf/majik-blender-edu"
 
 
-tags = ["System", "Pipeline", "Scene", "Modeling", "Mesh", "User Interface"]
+tags = ["Pipeline"]
 
 
 platforms = ["windows-x64", "macos-arm64", "linux-x64"]
@@ -46,4 +46,4 @@ wheels = [
 
 [permissions]
 network = "Access required for JSON file analysis"
-files = "Read/write keys and logs as JSON for integrity verification"
+files = "Read/write keys and logs as JSON for integrity verification. Autosave recovery log."
