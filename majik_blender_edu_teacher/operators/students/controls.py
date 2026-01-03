@@ -10,7 +10,6 @@ from ...core.timer import start_timer, stop_timer, load_timer_from_scene
 from ...core.logging import (
     export_encrypted_logs,
     get_security_mode,
-    load_logs_from_scene,
     operator_monitor,
     log_session_start,
     log_session_stop,
@@ -79,10 +78,7 @@ class STUDENT_OT_start_stop(bpy.types.Operator):
             self.report({"ERROR"}, "Encrypted submission not found")
             return {"CANCELLED"}
 
-        print("[STUDENT OT START STOP] Reloading logs and timer")
-        # Load persisted data once
-        load_timer_from_scene(scene)
-
+ 
         if runtime._timer_start is None:
             start_timer(scene)
             log_session_start("Session Timer Started")

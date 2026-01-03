@@ -6,7 +6,7 @@ import hashlib
 
 from ..core import runtime
 from ..core.text.session_log_controller import SessionLogController
-from .timer import save_timer_to_scene
+from .timer import save_timer_to_scene, load_timer_from_scene
 
 from .scene_stats import SceneStatsManager  # assuming you saved the class here
 
@@ -887,6 +887,9 @@ def log_session_event(
 def log_session_start(reason: str = "user_start"):
     if runtime.is_session_active():
         return  # prevent duplicate starts
+    scene = bpy.context.scene
+    load_logs_from_scene(scene)
+    load_timer_from_scene(scene)
 
     log_session_event(
         started=True,

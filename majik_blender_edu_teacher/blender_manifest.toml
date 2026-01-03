@@ -5,7 +5,7 @@ schema_version = "1.0.0"
 id = "majik_blender_edu_teacher"
 
 
-version = "1.1.1"
+version = "1.1.2"
 name = "Majik Blender Edu"
 tagline = "Submission integrity tool for educators to verify students' work"
 maintainer = "Zelijah"
