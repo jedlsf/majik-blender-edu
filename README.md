@@ -78,13 +78,12 @@ This addon leverages **Blender's native Python API** for precise action logging 
 
 ## Installation
 
-Majik Blender Edu can be installed either by downloading a prebuilt extension package or by building the extension directly from the source code.
+Majik Blender Edu is a Blender addon for verifying student work. Both teacher and student workflows are now consolidated into a single addon. A User Mode selector in the Scene Properties lets you switch between Teacher or Student mode. By default, it opens in Teacher mode.
 
 ### Option 1: Install from Prebuilt ZIP (Recommended)
 
 1. Download the `.zip` file.
-   - For Teachers ([Download Majik Blender Edu – Teacher](https://extensions.blender.org/approval-queue/majik-blender-edu-teacher))
-   - For Students ([Download Majik Blender Edu – Students](https://extensions.blender.org/approval-queue/majik-blender-edu-students))
+   - ([Download Majik Blender Edu](https://extensions.blender.org/approval-queue/majik-blender-edu-teacher)) (single addon, all modes included)
 2. Open **Blender > Edit > Preferences > Extensions > Install from Disk**.  
 3. Enable **Majik Blender Edu**.
 
@@ -106,18 +105,6 @@ git clone https://github.com/your-org/majik-blender-edu.git
 
 2. Run the following command to build the extension ZIP:
 
-```bash
-
-& "C:\Program Files\Blender Foundation\Blender 5.0\blender.exe" `
-  --background `
-  --factory-startup `
-  --command extension build `
-  --source-dir "C:\majik-blender-edu\majik_blender_edu_students" `
-  --output-dir "C:\majik-blender-edu\dist\students" `
-  --split-platforms `
-  --verbose
-
-```
 
 ```bash
 
@@ -149,7 +136,7 @@ For full details on Blender’s extension build system and available command-lin
 ### For Teachers
 
 **A. Encryption and Preparing a Project**
-1. Open Blender and access **Majik Blender Edu** in **Scene Properties**.  
+1. Open Blender and access **Majik Blender Edu** in **Scene Properties**. Select **Teacher** as your User Mode from the **Mode Selector**.
 2. Enter a key manually or generate a random one.  
 3. Download and securely store your key. **Keep this private**—it unlocks all logs.  
 4. Enter the student’s ID, email, or any identifier.  
@@ -173,7 +160,7 @@ For full details on Blender’s extension build system and available command-lin
 
 ### For Students
 
-1. Open Blender and access **Majik Blender Edu** in **Scene Properties**.  
+1. Open Blender and access **Majik Blender Edu** in **Scene Properties**. Select **Student** as your User Mode from the **Mode Selector**.
 2. Always **start the timer** before working; logging only records active sessions.  
 3. A red rectangle in the viewport signals an active session.  
 4. Stop the timer once finished to save logs. Manual saves (Ctrl+S) also store log progress.  

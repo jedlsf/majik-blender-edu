@@ -27,7 +27,7 @@ class ActionLogEntry(TypedDict):
     s: SceneStats  # scene_stats
     ph: str  # previous hash or genesis hash
 
-
+_known_materials: Dict[str, Dict[str, Any]] = {}
 _known_objects: set = set()
 _last_modifiers: dict = {}
 
@@ -119,7 +119,7 @@ def is_tampered() -> bool:
 
 def clear_runtime():
     """Reset all runtime-only data."""
-    global _timer_start, _timer_elapsed, _double_hash_key, _last_object_state, _transform_debounce, _log_dirty, _last_autosave_time, _runtime_metadata, _runtime_logs, _runtime_logs_raw, _is_tampered, _known_objects, _last_modifiers, _edit_debounce, _session_active, _last_stats_time, _last_scene_stats, _pending_log
+    global _timer_start, _timer_elapsed, _double_hash_key, _last_object_state, _transform_debounce, _log_dirty, _last_autosave_time, _runtime_metadata, _runtime_logs, _runtime_logs_raw, _is_tampered, _known_objects,_known_materials, _last_modifiers, _edit_debounce, _session_active, _last_stats_time, _last_scene_stats, _pending_log
 
     _timer_start = None
     _timer_elapsed = 0.0
@@ -133,6 +133,7 @@ def clear_runtime():
     _runtime_logs_raw.clear()
     _is_tampered = False
     _known_objects.clear()
+    _known_materials.clear()
     _last_modifiers.clear()
     _edit_debounce.clear()
     _session_active = False

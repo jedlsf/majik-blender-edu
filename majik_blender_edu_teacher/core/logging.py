@@ -3,11 +3,15 @@ import time
 import json
 import base64
 import hashlib
-import re
 
 from ..core import runtime
 from ..core.text.session_log_controller import SessionLogController
 from .timer import save_timer_to_scene
+
+from .scene_stats import SceneStatsManager  # assuming you saved the class here
+
+scene = bpy.context.scene
+_scene_stats_manager = SceneStatsManager(scene)
 
 from .constants import (
     SCENE_SIGNATURE_MODE,
@@ -15,7 +19,7 @@ from .constants import (
 
 from ..core.recovery import Recovery
 
-from typing import TypedDict, Dict, Any, List, Literal
+from typing import Set, TypedDict, Dict, Any, List, Literal
 
 
 # --------------------------------------------------
@@ -58,10 +62,48 @@ class ExportLogsResult(TypedDict):
 # --------------------------------------------------
 
 
+def rebuild_runtime_cache_from_scene(scene=None):
+    """
+    Scan the entire scene and populate runtime._known_objects, _last_object_state,
+    and _last_modifiers with current object data.
+    """
+    if scene is None:
+        scene = bpy.context.scene
+
+    # Make sure runtime attributes exist
+    if not hasattr(runtime, "_known_objects"):
+        runtime._known_objects = set()
+    if not hasattr(runtime, "_last_object_state"):
+        runtime._last_object_state = {}
+    if not hasattr(runtime, "_last_modifiers"):
+        runtime._last_modifiers = {}
+
+    for obj in scene.objects:
+        if obj.type in {"MESH", "CURVE", "ARMATURE"}:
+            name = obj.name
+
+            # Add to known objects
+            runtime._known_objects.add(name)
+
+            # Save object state (location, rotation, scale, type)
+            runtime._last_object_state[name] = _get_object_state(obj)
+
+            # Save current modifiers
+            runtime._last_modifiers[name] = {mod.name for mod in obj.modifiers}
+
+    print(
+        f"[Majik] Rebuilt runtime cache: {len(runtime._known_objects)} objects tracked."
+    )
+
+
 IDLE_THRESHOLD = 60.0  # Seconds of inactivity before force-committing
 
 if not hasattr(runtime, "_known_objects"):
     runtime._known_objects = set()
+
+if not hasattr(runtime, "_known_materials"):
+    runtime._known_materials = {}
+
 
 if not hasattr(runtime, "_last_modifiers"):
     runtime._last_modifiers = {}
@@ -289,8 +331,9 @@ def add_log_aggregated(action_type, object_name, object_type, action_details=Non
         else:
             # Either task changed OR they were idle too long. Commit it.
             finalize_and_commit_log()
-            print(f"[Majik Log] [Idle Commit] {pending['a']} -> {pending['o']} ({pending['ot']})")
-
+            print(
+                f"[Majik Log] [Idle Commit] {pending['a']} -> {pending['o']} ({pending['ot']})"
+            )
 
     # 2. Start a NEW session
     runtime._pending_log = {
@@ -305,7 +348,9 @@ def add_log_aggregated(action_type, object_name, object_type, action_details=Non
         "ph": None,
     }
 
-    print(f"[Majik Log] [New Pending Log] {action_type} -> {object_name} ({object_type})")
+    print(
+        f"[Majik Log] [New Pending Log] {action_type} -> {object_name} ({object_type})"
+    )
 
 
 def finalize_and_commit_log():
@@ -406,7 +451,6 @@ def validate_genesis_log(scene, teacher_key: str, student_id: str) -> bool:
     if not runtime._runtime_logs_raw:
         print("[VALIDATE GENESIS LOG] Reloading logs")
         load_logs_from_scene(scene)
-        
 
     if not runtime._runtime_logs_raw:
         raise RuntimeError("No log entries found; cannot validate genesis log")
@@ -444,12 +488,56 @@ def load_logs_from_scene(scene):
     print("[Logging] Loading logs from Text datablock")
     logs = SessionLogController.load_logs_from_text(scene=scene)
     runtime._runtime_logs_raw = logs
+    rebuild_runtime_cache_from_scene(scene)
     return logs
 
 
 # --------------------------------------------------
 # DETECT GENERAL MESH CHANGES
 # --------------------------------------------------
+
+
+def detect_deleted_objects(scene):
+    """
+    Check for objects that were in _known_objects but no longer exist in the scene.
+    Logs a 'Deleted Object' action for each removed object.
+    Also purges unused materials from _known_materials.
+    """
+    current_objects = {
+        obj.name for obj in scene.objects if obj.type in {"MESH", "CURVE", "ARMATURE"}
+    }
+    deleted_objects = runtime._known_objects - current_objects
+
+    for obj_name in deleted_objects:
+        obj_type = runtime._last_object_state.get(obj_name, {}).get("type", "UNKNOWN")
+
+        add_log_aggregated(
+            action_type="Deleted Object",
+            object_name=obj_name,
+            object_type=obj_type,
+        )
+        print(f"[Majik Log] Deleted Object -> {obj_name} ({obj_type})")
+
+        # Cleanup object tracking
+        runtime._known_objects.remove(obj_name)
+        runtime._last_modifiers.pop(obj_name, None)
+        runtime._last_object_state.pop(obj_name, None)
+        runtime._transform_debounce.pop(obj_name, None)
+        runtime._edit_debounce.pop(obj_name, None)
+
+        # -------------------------------
+        # Cleanup _known_materials
+        # -------------------------------
+        for mat_name, mat_data in list(runtime._known_materials.items()):
+            if obj_name in mat_data["users"]:
+                mat_data["users"].discard(obj_name)
+                if not mat_data["users"]:
+                    runtime._known_materials.pop(mat_name)
+                    add_log_aggregated(
+                        action_type="Deleted Material",
+                        object_name=mat_name,
+                        object_type="MATERIAL",
+                    )
 
 
 def detect_mesh_action(obj) -> str | None:
@@ -462,29 +550,109 @@ def detect_mesh_action(obj) -> str | None:
     name = obj.name
 
     # -------------------------------
-    # 1. New object detection
+    # New object detection
     # -------------------------------
     if name not in runtime._known_objects:
         runtime._known_objects.add(name)
         if obj.type == "MESH":
             prim_type = obj.get("primitive_type", "Mesh")
             runtime._last_object_state[name] = _get_object_state(obj)
+            # Update _known_materials for initial materials
+            for mat_info in runtime._last_object_state[name]["materials"]:
+                mat_name = mat_info["name"]
+                if mat_name not in runtime._known_materials:
+                    runtime._known_materials[mat_name] = {
+                        "users": set(),
+                        "textures": set(),
+                    }
+                runtime._known_materials[mat_name]["users"].add(name)
+                if "textures" in mat_info:
+                    runtime._known_materials[mat_name]["textures"].update(
+                        mat_info["textures"]
+                    )
             return f"Added {prim_type}"
 
     # -------------------------------
-    # 2. Modifier added
+    # Modifier added / removed
     # -------------------------------
     last_mods = runtime._last_modifiers.get(name)
     current_mods = {mod.name for mod in obj.modifiers}
 
     if last_mods is None:
         runtime._last_modifiers[name] = current_mods
-    elif added_mods := current_mods - last_mods:
-        runtime._last_modifiers[name] = current_mods
-        return f"Added Modifier: {', '.join(sorted(added_mods))}"
+    else:
+        added_mods = current_mods - last_mods
+        removed_mods = last_mods - current_mods
+
+        if added_mods or removed_mods:
+            runtime._last_modifiers[name] = current_mods
+            messages = []
+            if added_mods:
+                messages.append(f"Added Modifier: {', '.join(sorted(added_mods))}")
+            if removed_mods:
+                messages.append(f"Removed Modifier: {', '.join(sorted(removed_mods))}")
+            return " | ".join(messages)
 
     # -------------------------------
-    # 3. Edit mode debounce
+    # Material / Texture changes
+    # -------------------------------
+    last_state = runtime._last_object_state.get(name, {})
+    last_materials = {m["name"] for m in last_state.get("materials", [])}
+    current_materials = {
+        slot.material.name for slot in obj.material_slots if slot.material
+    }
+
+    added_mats = current_materials - last_materials
+    removed_mats = last_materials - current_materials
+
+    messages = []
+
+    # Added materials
+    for mat_name in added_mats:
+        messages.append(f"Added Material: {mat_name}")
+        if mat_name not in runtime._known_materials:
+            runtime._known_materials[mat_name] = {"users": set(), "textures": set()}
+        runtime._known_materials[mat_name]["users"].add(name)
+
+    # Removed materials
+    for mat_name in removed_mats:
+        messages.append(f"Removed Material: {mat_name}")
+        if mat_name in runtime._known_materials:
+            runtime._known_materials[mat_name]["users"].discard(name)
+            if not runtime._known_materials[mat_name]["users"]:
+                runtime._known_materials.pop(mat_name)
+                add_log_aggregated(
+                    action_type="Deleted Material",
+                    object_name=mat_name,
+                    object_type="MATERIAL",
+                )
+
+    # Update textures for all current materials
+    for slot in obj.material_slots:
+        if slot.material and slot.material.use_nodes:
+            mat_name = slot.material.name
+            texs = {
+                node.image.name
+                for node in slot.material.node_tree.nodes
+                if node.type == "TEX_IMAGE" and node.image
+            }
+            if mat_name in runtime._known_materials:
+                new_textures = texs - runtime._known_materials[mat_name]["textures"]
+                for tex in new_textures:
+                    add_log_aggregated(
+                        action_type="Texture Added",
+                        object_name=tex,
+                        object_type="TEXTURE",
+                        action_details={"material": mat_name},
+                    )
+                runtime._known_materials[mat_name]["textures"].update(texs)
+
+    if added_mats or removed_mats:
+        runtime._last_object_state[name] = _get_object_state(obj)
+        return " | ".join(messages)
+
+    # -------------------------------
+    # Edit mode debounce
     # -------------------------------
     if obj.mode == "EDIT":
         last_edit = runtime._edit_debounce.get(name, 0)
@@ -493,27 +661,80 @@ def detect_mesh_action(obj) -> str | None:
             return "Edited Mesh"
 
     # -------------------------------
-    # 4. Transform debounce
+    # Transform debounce
     # -------------------------------
-    state = _get_object_state(obj)
     last_state = runtime._last_object_state.get(name)
+    current_state = _get_object_state(obj)
 
     last_transform = runtime._transform_debounce.get(name, 0)
-    if state != last_state and now - last_transform > 0.3:
-        runtime._last_object_state[name] = state
+    if (
+        last_state is not None
+        and current_state != last_state
+        and now - last_transform > 0.3
+    ):
+        runtime._last_object_state[name] = current_state
         runtime._transform_debounce[name] = now
-        return "Transformed Object"
+
+        # Compare individual components
+        last_loc, last_rot, last_scale = (
+            last_state["location"],
+            last_state["rotation"],
+            last_state["scale"],
+        )
+        cur_loc, cur_rot, cur_scale = (
+            current_state["location"],
+            current_state["rotation"],
+            current_state["scale"],
+        )
+
+        changes = []
+        if last_loc != cur_loc:
+            changes.append("Location")
+        if last_rot != cur_rot:
+            changes.append("Rotation")
+        if last_scale != cur_scale:
+            changes.append("Scale")
+
+        return (
+            f"Transformed Object ({', '.join(changes)})"
+            if changes
+            else "Transformed Object"
+        )
 
     return None
 
 
 def _get_object_state(obj):
-    """Cache-friendly tuple state of object location/rotation/scale rounded to 0.1"""
-    return (
-        tuple(round(v, 1) for v in obj.location),
-        tuple(round(v, 1) for v in obj.rotation_euler),
-        tuple(round(v, 1) for v in obj.scale),
-    )
+    """Cache-friendly state of object location/rotation/scale/type, with materials."""
+    materials = []
+    for slot in obj.material_slots:
+        if slot.material:
+            mat = slot.material
+            # Collect basic info; optionally add textures
+            mat_info = {
+                "name": mat.name,
+                "use_nodes": mat.use_nodes,
+            }
+            # If using nodes, collect image textures
+            if mat.use_nodes:
+                textures = []
+                for node in mat.node_tree.nodes:
+                    if node.type == "TEX_IMAGE" and node.image:
+                        textures.append(node.image.name)
+                mat_info["textures"] = textures
+            materials.append(mat_info)
+
+    return {
+        "location": tuple(obj.location),
+        "rotation": (
+            tuple(obj.rotation_euler)
+            if obj.rotation_mode != "QUATERNION"
+            else tuple(obj.rotation_quaternion)
+        ),
+        "scale": tuple(obj.scale),
+        "type": obj.type,  # store type
+        "materials": materials,  # added
+    }
 
 
 def log_simple_action(obj):
@@ -531,7 +752,10 @@ def on_depsgraph_update(scene, depsgraph):
     if bpy.app.background or runtime._timer_start is None:
         return
 
-    updated_objs: set[bpy.types.Object] = set()
+    # --- Detect deleted objects first ---
+    detect_deleted_objects(scene)
+
+    updated_objs: Set[bpy.types.Object] = set()
 
     # Collect all relevant updated objects
     for update in depsgraph.updates:
@@ -686,35 +910,20 @@ def log_session_stop(reason: str = "user_stop"):
 
 
 def get_scene_stats(scene) -> SceneStats:
-    now = time.time()
-    last = getattr(runtime, "_last_stats_time", 0)
-
-    if now - last < 1.0:
-        return runtime._last_scene_stats
-
+    """
+    Returns the current scene stats, respecting edit mode and armature edit mode.
+    Uses caching to avoid frequent recomputation.
+    """
     stats_str = scene.statistics(bpy.context.view_layer)
 
-    def extract_denominator(pattern: str) -> int:
-        """
-        Extracts the denominator if format is 'num/den', else returns the number itself.
-        """
-        match = re.search(pattern, stats_str)
-        if not match:
-            return 0
-        val = match.group(1).replace(",", "")
-        if "/" in val:
-            return int(val.split("/")[1])
-        return int(val)
+    # If we are in edit mode or armature edit mode, use last stored stats
+    if _scene_stats_manager.is_edit_mode(
+        stats_str
+    ) or _scene_stats_manager.is_armature_edit_mode(stats_str):
+        return _scene_stats_manager._last_scene_stats
 
-    verts = extract_denominator(r"Verts:([\d/,]+)")
-    faces = extract_denominator(r"Faces:([\d/,]+)")
-    objects = extract_denominator(r"Objects:([\d/,]+)")
-
-    stats = {"v": verts, "f": faces, "o": objects}
-
-    runtime._last_scene_stats = stats
-    runtime._last_stats_time = now
-    return stats
+    # Otherwise, compute fresh stats
+    return _scene_stats_manager.get_scene_stats(scene)
 
 
 def get_total_scene_stats(scene) -> SceneStats:

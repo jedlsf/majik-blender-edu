@@ -810,8 +810,7 @@ Majik Blender Edu is designed to be flexible. You can integrate it into your own
 
 | Integration Type  | Description                                              | Link                                                                                                           |
 | :---------------- | :------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------- |
-| **Teacher Addon** | Encrypt and validate student sessions.                   | [Download](https://extensions.blender.org/approval-queue/majik-blender-edu-teacher)                            |
-| **Student Addon** | Log actions for submission.                              | [Download](https://extensions.blender.org/approval-queue/majik-blender-edu-students)                           |
+| **Blender Addon** | Encrypt and validate student sessions.                   | [Download](https://extensions.blender.org/approval-queue/majik-blender-edu-teacher)                            |
 | **Analyzer SDK**  | TypeScript/NPM package to process logs programmatically. | [@thezelijah/majik-blender-edu-analyzer](https://www.npmjs.com/package/@thezelijah/majik-blender-edu-analyzer) |
 | **Source Code**   | Full source, issues, and contribution guide.             | [GitHub Repo](https://github.com/jedlsf/majik-blender-edu)                                                     |
 
