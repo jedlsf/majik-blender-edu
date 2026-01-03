@@ -10,8 +10,6 @@ from .timer import save_timer_to_scene
 
 from .scene_stats import SceneStatsManager  # assuming you saved the class here
 
-scene = bpy.context.scene
-_scene_stats_manager = SceneStatsManager(scene)
 
 from .constants import (
     SCENE_SIGNATURE_MODE,
@@ -915,6 +913,10 @@ def get_scene_stats(scene) -> SceneStats:
     Uses caching to avoid frequent recomputation.
     """
     stats_str = scene.statistics(bpy.context.view_layer)
+
+    scene = bpy.context.scene
+    _scene_stats_manager = SceneStatsManager(scene)
+
 
     # If we are in edit mode or armature edit mode, use last stored stats
     if _scene_stats_manager.is_edit_mode(

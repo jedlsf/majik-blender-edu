@@ -46,4 +46,4 @@ wheels = [
 
 [permissions]
 network = "Access required for JSON file analysis"
-files = "Read/write keys and logs as JSON for integrity verification. Autosave recovery log."
+files = "Read/write keys and logs as JSON for integrity verification"
