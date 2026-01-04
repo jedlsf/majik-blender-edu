@@ -251,8 +251,7 @@ Majik Blender Edu is designed to be flexible. You can integrate it into your own
 
 | Integration Type  | Description                                              | Link                                                                                                           |
 | :---------------- | :------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------- |
-| **Teacher Addon** | Encrypt and validate student sessions.                   | [Download](https://extensions.blender.org/approval-queue/majik-blender-edu-teacher)                            |
-| **Student Addon** | Log actions for submission.                              | [Download](https://extensions.blender.org/approval-queue/majik-blender-edu-students)                           |
+| **Teacher Addon** | Encrypt and validate student sessions and log actions for submission.                      | [Download](https://extensions.blender.org/approval-queue/majik-blender-edu-teacher)                            |
 | **Analyzer SDK**  | TypeScript/NPM package to process logs programmatically. | [@thezelijah/majik-blender-edu-analyzer](https://www.npmjs.com/package/@thezelijah/majik-blender-edu-analyzer) |
 | **Source Code**   | Full source, issues, and contribution guide.             | [GitHub Repo](https://github.com/jedlsf/majik-blender-edu)                                                     |
 
@@ -866,7 +865,7 @@ If you want to contribute or help extend support to more Blender versions and pl
 
 This project uses a **split-licensing model** to provide both community protection and developer flexibility:
 
-### 1. Blender Addon (Teacher & Student Versions)
+### 1. Blender Addon
 The Blender extensions are licensed under the **GNU General Public License v3.0 or later (GPL-3.0-or-later)**.
 * You are free to use, modify, and redistribute this software.
 * Any derivative works of the Blender Addon must also be distributed under the GPL-3.0-or-later.
