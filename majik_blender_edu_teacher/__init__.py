@@ -12,14 +12,8 @@ bl_info = {
 
 import bpy  # type: ignore
 
-from .core.crypto import install_crypto_wheel, is_crypto_installed
 
 
-def try_install_crypto():
-    if not is_crypto_installed():
-        print("[ADDON] Cryptography not yet installed, attempting install...")
-        install_crypto_wheel()
-    return None  # stop the timer
 
 
 def restore_logs_on_start():
@@ -56,7 +50,6 @@ def safe_restore_logs():
     return None  # timers need this
 
 
-bpy.app.timers.register(try_install_crypto)
 bpy.app.timers.register(safe_restore_logs)
 
 # --------------------------------------------------
@@ -73,37 +66,9 @@ from .core.logging import register_logging_handlers, unregister_logging_handlers
 from .core import runtime
 
 
-# ---------------------------------------
-# Addon Preferences
-# ---------------------------------------
-class MAJIK_OT_addon_prefs(bpy.types.AddonPreferences):
-    bl_idname = "majik_blender_edu_teacher"
-
-    # default_user_mode = bpy.props.EnumProperty(
-    #     name="Default User Mode",
-    #     description="Default mode when opening a new file",
-    #     items=[
-    #         ("TEACHER", "Teacher", "Instructor mode"),
-    #         ("STUDENT", "Student", "Student mode"),
-    #     ],
-    #     default="TEACHER",
-    # )
-
-    # lock_user_mode = bpy.props.BoolProperty(
-    #     name="Lock User Mode",
-    #     description="Prevent changing user mode inside the scene",
-    #     default=False,
-    # )
-
-    def draw(self, context):
-        layout = self.layout
-        layout.label(text="Majik Blender Edu – Global Settings")
-        # layout.prop(self, "default_user_mode")
-        # layout.prop(self, "lock_user_mode")
 
 
 classes = [
-    MAJIK_OT_addon_prefs,
     SIGNATURE_OT_encrypt,
     SIGNATURE_OT_decrypt,
     SIGNATURE_OT_export_logs,

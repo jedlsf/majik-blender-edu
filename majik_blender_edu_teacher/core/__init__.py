@@ -1,6 +1,5 @@
 from .crypto import (
     fernet_key_from_string,
-    install_crypto_wheel,
     encrypt_metadata,
     decrypt_metadata,
 )
@@ -61,7 +60,6 @@ from .logging import (
 
 __all__ = [
     "fernet_key_from_string",
-    "install_crypto_wheel",
     "decrypt_metadata",
     "encrypt_metadata",
     "compute_object_hash",
