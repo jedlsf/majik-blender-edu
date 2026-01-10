@@ -87,7 +87,7 @@ Majik Blender Edu is a Blender addon for verifying student work. Both teacher an
 2. Open **Blender > Edit > Preferences > Extensions > Install from Disk**.  
 3. Enable **Majik Blender Edu**.
 
-<img width="875" height="607" alt="image" src="https://github.com/user-attachments/assets/5560504c-bb73-4d01-987e-7519069ec557" />
+<img width="869" height="504" alt="image" src="https://github.com/user-attachments/assets/7f82868f-1724-4b7c-a80a-60e97c0e5869" />
 
 
 ### Option 2: Build from Source (Advanced / Developers)
@@ -136,6 +136,9 @@ For full details on Blender’s extension build system and available command-lin
 ### For Teachers
 
 **A. Encryption and Preparing a Project**
+
+<img width="361" height="305" alt="image" src="https://github.com/user-attachments/assets/1c43b1cf-a175-46ee-a2b3-91666b80fd77" />
+
 1. Open Blender and access **Majik Blender Edu** in **Scene Properties**. Select **Teacher** as your User Mode from the **Mode Selector**.
 2. Enter a key manually or generate a random one.  
 3. Download and securely store your key. **Keep this private**—it unlocks all logs.  
@@ -143,6 +146,9 @@ For full details on Blender’s extension build system and available command-lin
 5. Click **Encrypt & Apply Signature**. This marks the project as teacher-signed. Students can now begin their session.  
 
 **B. Decryption and Validation**
+
+<img width="364" height="446" alt="image" src="https://github.com/user-attachments/assets/90aa686a-cccb-4861-b31c-490a7102617d" />
+
 1. Open the submitted project in Blender.  
 2. Navigate to the **Decrypt** tab in Scene Properties.  
 3. Import or enter your key.  
@@ -152,6 +158,10 @@ For full details on Blender’s extension build system and available command-lin
 7. Upload the JSON to [Majik Blender Edu Analyzer](https://thezelijah.world/tools/education-majik-blender-edu) for insights.  
 
 **C. Resetting a Project**
+
+<img width="342" height="143" alt="image" src="https://github.com/user-attachments/assets/3ca7e8b3-02d7-4803-a8fa-43de595e4c1a" />
+
+
 1. Decrypt and validate the project first.  
 2. The **Reset Key** button will appear.  
 3. Click it to remove all existing logs and settings. **Warning:** This action is irreversible.  
@@ -159,6 +169,9 @@ For full details on Blender’s extension build system and available command-lin
 ---
 
 ### For Students
+
+<img width="347" height="237" alt="image" src="https://github.com/user-attachments/assets/99721e6f-7afe-491f-91c3-83b68d076dd6" />
+
 
 1. Open Blender and access **Majik Blender Edu** in **Scene Properties**. Select **Student** as your User Mode from the **Mode Selector**.
 2. Always **start the timer** before working; logging only records active sessions.  
@@ -238,8 +251,7 @@ Majik Blender Edu is designed to be flexible. You can integrate it into your own
 
 | Integration Type  | Description                                              | Link                                                                                                           |
 | :---------------- | :------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------- |
-| **Teacher Addon** | Encrypt and validate student sessions.                   | [Download](https://extensions.blender.org/approval-queue/majik-blender-edu-teacher)                            |
-| **Student Addon** | Log actions for submission.                              | [Download](https://extensions.blender.org/approval-queue/majik-blender-edu-students)                           |
+| **Teacher Addon** | Encrypt and validate student sessions and log actions for submission.                      | [Download](https://extensions.blender.org/approval-queue/majik-blender-edu-teacher)                            |
 | **Analyzer SDK**  | TypeScript/NPM package to process logs programmatically. | [@thezelijah/majik-blender-edu-analyzer](https://www.npmjs.com/package/@thezelijah/majik-blender-edu-analyzer) |
 | **Source Code**   | Full source, issues, and contribution guide.             | [GitHub Repo](https://github.com/jedlsf/majik-blender-edu)                                                     |
 
@@ -853,7 +865,7 @@ If you want to contribute or help extend support to more Blender versions and pl
 
 This project uses a **split-licensing model** to provide both community protection and developer flexibility:
 
-### 1. Blender Addon (Teacher & Student Versions)
+### 1. Blender Addon
 The Blender extensions are licensed under the **GNU General Public License v3.0 or later (GPL-3.0-or-later)**.
 * You are free to use, modify, and redistribute this software.
 * Any derivative works of the Blender Addon must also be distributed under the GPL-3.0-or-later.
