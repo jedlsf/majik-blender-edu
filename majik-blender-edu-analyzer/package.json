@@ -1,6 +1,6 @@
 {
   "name": "@thezelijah/majik-blender-edu-analyzer",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Majik Blender Edu is a submission integrity and student activity tracking addon for Blender designed to help educators verify a student's work. It records Blender-specific actions such as editing meshes, adding modifiers, importing assets, and scene statistics (vertices, faces, etc.), ensuring that submitted projects are authentic and untampered.",
   "license": "Apache-2.0",
   "author": "Zelijah",
